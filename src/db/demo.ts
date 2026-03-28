@@ -36,9 +36,6 @@ function jitter(base: number, pct: number): number {
   return base + base * (Math.random() * 2 - 1) * pct;
 }
 
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
 
 async function generateDemoData() {
   const allEx = await db.exercises.toArray();
@@ -85,12 +82,10 @@ async function generateDemoData() {
     { exerciseId: id('Standing Calf Raise'), sets: 4, repRange: [10, 15] as [number, number], restSeconds: 60 },
   ];
 
-  const [upperAId, upperBId, lowerAId, lowerBId] = await db.workouts.bulkAdd([
-    { name: 'Upper A — Strength', exercises: upperAExercises },
-    { name: 'Upper B — Hypertrophy', exercises: upperBExercises },
-    { name: 'Lower A — Quad Focus', exercises: lowerAExercises },
-    { name: 'Lower B — Posterior Focus', exercises: lowerBExercises },
-  ], { allKeys: true });
+  const upperAId = await db.workouts.add({ name: 'Upper A — Strength', exercises: upperAExercises });
+  const upperBId = await db.workouts.add({ name: 'Upper B — Hypertrophy', exercises: upperBExercises });
+  const lowerAId = await db.workouts.add({ name: 'Lower A — Quad Focus', exercises: lowerAExercises });
+  const lowerBId = await db.workouts.add({ name: 'Lower B — Posterior Focus', exercises: lowerBExercises });
 
   // --- Program ---
   await db.programs.add({
