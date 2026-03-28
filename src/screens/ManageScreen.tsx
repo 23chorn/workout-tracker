@@ -333,7 +333,9 @@ function WorkoutManager() {
     }]);
   };
 
-  const updateWExercise = (idx: number, field: string, value: number) => {
+  const updateWExercise = (idx: number, field: string, raw: string) => {
+    const value = raw === '' ? 0 : parseInt(raw);
+    if (isNaN(value)) return;
     setWExercises(prev => {
       const next = [...prev];
       if (field === 'sets') next[idx] = { ...next[idx], sets: value };
@@ -407,19 +409,19 @@ function WorkoutManager() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Sets</label>
-                  <input type="number" value={we.sets} onChange={e => updateWExercise(idx, 'sets', parseInt(e.target.value) || 0)} />
+                  <input type="number" value={we.sets || ''} onChange={e => updateWExercise(idx, 'sets', e.target.value)} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Min</label>
-                  <input type="number" value={we.repRange[0]} onChange={e => updateWExercise(idx, 'repMin', parseInt(e.target.value) || 0)} />
+                  <input type="number" value={we.repRange[0] || ''} onChange={e => updateWExercise(idx, 'repMin', e.target.value)} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Max</label>
-                  <input type="number" value={we.repRange[1]} onChange={e => updateWExercise(idx, 'repMax', parseInt(e.target.value) || 0)} />
+                  <input type="number" value={we.repRange[1] || ''} onChange={e => updateWExercise(idx, 'repMax', e.target.value)} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Rest</label>
-                  <input type="number" value={we.restSeconds} onChange={e => updateWExercise(idx, 'restSeconds', parseInt(e.target.value) || 0)} />
+                  <input type="number" value={we.restSeconds || ''} onChange={e => updateWExercise(idx, 'restSeconds', e.target.value)} />
                 </div>
               </div>
             </div>
