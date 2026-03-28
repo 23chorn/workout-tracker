@@ -82,10 +82,10 @@ async function generateDemoData() {
     { exerciseId: id('Standing Calf Raise'), sets: 4, repRange: [10, 15] as [number, number], restSeconds: 60 },
   ];
 
-  const upperAId = await db.workouts.add({ name: 'Upper A — Strength', exercises: upperAExercises });
-  const upperBId = await db.workouts.add({ name: 'Upper B — Hypertrophy', exercises: upperBExercises });
-  const lowerAId = await db.workouts.add({ name: 'Lower A — Quad Focus', exercises: lowerAExercises });
-  const lowerBId = await db.workouts.add({ name: 'Lower B — Posterior Focus', exercises: lowerBExercises });
+  const upperAId = (await db.workouts.add({ name: 'Upper A — Strength', exercises: upperAExercises })) as number;
+  const upperBId = (await db.workouts.add({ name: 'Upper B — Hypertrophy', exercises: upperBExercises })) as number;
+  const lowerAId = (await db.workouts.add({ name: 'Lower A — Quad Focus', exercises: lowerAExercises })) as number;
+  const lowerBId = (await db.workouts.add({ name: 'Lower B — Posterior Focus', exercises: lowerBExercises })) as number;
 
   // --- Program ---
   await db.programs.add({
@@ -140,7 +140,7 @@ async function generateDemoData() {
     exercises: { exerciseId: number; sets: { weight: number; reps: number; isWorkingSet: boolean }[]; e10RM: number }[];
   }[] = [];
 
-  const programId = (await db.programs.toArray())[0].id!;
+  const programId = (await db.programs.toArray())[0].id as number;
 
   for (let week = 0; week < 13; week++) {
     // Occasionally skip a session (simulate life getting in the way)

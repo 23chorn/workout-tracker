@@ -4,7 +4,7 @@ import { db, type Exercise, type SessionSet, type SessionExercise, type ActiveSe
 import { getSuggestion } from '../utils/progression';
 import { sessionE10RM } from '../utils/e10rm';
 import { useRestTimer } from '../hooks/useRestTimer';
-import { Check, X, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, X, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 interface ExerciseState {
   exerciseId: number;
@@ -18,7 +18,9 @@ interface ExerciseState {
 
 export function TodayScreen() {
   const programs = useLiveQuery(() => db.programs.toArray()) ?? [];
+  const allExercises = useLiveQuery(() => db.exercises.orderBy('name').toArray()) ?? [];
   const [selectedProgramId, setSelectedProgramId] = useState<number | null>(null);
+  const [showAddExercise, setShowAddExercise] = useState(false);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [exerciseStates, setExerciseStates] = useState<ExerciseState[]>([]);
@@ -174,6 +176,45 @@ export function TodayScreen() {
       if (target < 0 || target >= prev.length) return prev;
       const next = [...prev];
       [next[idx], next[target]] = [next[target], next[idx]];
+      persistSession(next);
+      return next;
+    });
+  };
+
+  const addExerciseToSession = async (exerciseId: number) => {
+    const ex = allExercises.find(e => e.id === exerciseId);
+    if (!ex) return;
+    // Add to the exercise map if not already there
+    setExercises(prev => {
+      const next = new Map(prev);
+      next.set(ex.id!, ex);
+      return next;
+    });
+    const suggestion = await getSuggestion(exerciseId, 12);
+    const newState: ExerciseState = {
+      exerciseId,
+      sets: Array.from({ length: 3 }, () => ({
+        weight: suggestion.weight > 0 ? String(suggestion.weight) : '',
+        reps: '',
+        isWorkingSet: true,
+      })),
+      restSeconds: ex.defaultRestSeconds,
+      suggestedWeight: suggestion.weight,
+      suggestionReason: suggestion.reason,
+      repRange: [8, 12],
+      numSets: 3,
+    };
+    setExerciseStates(prev => {
+      const next = [...prev, newState];
+      persistSession(next);
+      return next;
+    });
+    setShowAddExercise(false);
+  };
+
+  const removeExerciseFromSession = (idx: number) => {
+    setExerciseStates(prev => {
+      const next = prev.filter((_, i) => i !== idx);
       persistSession(next);
       return next;
     });
@@ -347,24 +388,34 @@ export function TodayScreen() {
                   )}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginRight: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <button
+                    className="btn btn-sm"
+                    style={{ padding: '2px 4px', minHeight: 0, opacity: exIdx === 0 ? 0.3 : 1 }}
+                    onClick={() => moveExercise(exIdx, -1)}
+                    disabled={exIdx === 0}
+                    aria-label="Move up"
+                  >
+                    <ChevronUp size={16} />
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ padding: '2px 4px', minHeight: 0, opacity: exIdx === exerciseStates.length - 1 ? 0.3 : 1 }}
+                    onClick={() => moveExercise(exIdx, 1)}
+                    disabled={exIdx === exerciseStates.length - 1}
+                    aria-label="Move down"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
                 <button
                   className="btn btn-sm"
-                  style={{ padding: '2px 4px', minHeight: 0, opacity: exIdx === 0 ? 0.3 : 1 }}
-                  onClick={() => moveExercise(exIdx, -1)}
-                  disabled={exIdx === 0}
-                  aria-label="Move up"
+                  style={{ padding: '4px', minHeight: 0, color: 'var(--red)' }}
+                  onClick={() => removeExerciseFromSession(exIdx)}
+                  aria-label="Remove exercise"
                 >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  className="btn btn-sm"
-                  style={{ padding: '2px 4px', minHeight: 0, opacity: exIdx === exerciseStates.length - 1 ? 0.3 : 1 }}
-                  onClick={() => moveExercise(exIdx, 1)}
-                  disabled={exIdx === exerciseStates.length - 1}
-                  aria-label="Move down"
-                >
-                  <ChevronDown size={16} />
+                  <Trash2 size={16} />
                 </button>
               </div>
               <span className={`badge badge-${es.suggestionReason === 'increase' ? 'green' : es.suggestionReason === 'deload' ? 'red' : 'accent'}`}>
@@ -421,9 +472,44 @@ export function TodayScreen() {
         );
       })}
 
-      <button className="btn btn-primary btn-full mt-md" onClick={completeSession}>
+      <button className="btn btn-secondary btn-full mt-md" onClick={() => setShowAddExercise(true)}>
+        <Plus size={18} /> Add Exercise
+      </button>
+
+      <button className="btn btn-primary btn-full mt-sm" onClick={completeSession}>
         <Check size={18} /> Complete Session
       </button>
+
+      {showAddExercise && (
+        <div className="modal-overlay" onClick={() => setShowAddExercise(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Add Exercise</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+              This won't modify the saved workout template.
+            </p>
+            <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+              {allExercises
+                .filter(ex => !exerciseStates.some(es => es.exerciseId === ex.id))
+                .map(ex => (
+                  <button
+                    key={ex.id}
+                    className="list-item"
+                    onClick={() => addExerciseToSession(ex.id!)}
+                  >
+                    <div>
+                      <div className="title">{ex.name}</div>
+                      <div className="subtitle">{ex.muscleGroup}</div>
+                    </div>
+                    <Plus size={16} color="var(--accent)" />
+                  </button>
+                ))}
+            </div>
+            <button className="btn btn-secondary btn-full mt-md" onClick={() => setShowAddExercise(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
