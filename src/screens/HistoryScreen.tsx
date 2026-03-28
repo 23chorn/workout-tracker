@@ -483,6 +483,7 @@ export function HistoryScreen() {
                     weekday: 'short', month: 'short', day: 'numeric'
                   })}
                   {wk && ` — ${wk.name}`}
+                  {session.durationMinutes != null && ` · ${session.durationMinutes}m`}
                 </div>
               </div>
               <ChevronRight size={18} color="var(--text-muted)" />
