@@ -220,6 +220,34 @@ export function TodayScreen() {
     });
   };
 
+  const addSet = (exIdx: number) => {
+    setExerciseStates(prev => {
+      const next = [...prev];
+      const ex = { ...next[exIdx], sets: [...next[exIdx].sets] };
+      const lastSet = ex.sets[ex.sets.length - 1];
+      ex.sets.push({
+        weight: lastSet?.weight ?? '',
+        reps: '',
+        isWorkingSet: true,
+      });
+      next[exIdx] = ex;
+      persistSession(next);
+      return next;
+    });
+  };
+
+  const removeLastSet = (exIdx: number) => {
+    setExerciseStates(prev => {
+      const next = [...prev];
+      const ex = { ...next[exIdx], sets: [...next[exIdx].sets] };
+      if (ex.sets.length <= 1) return prev;
+      ex.sets.pop();
+      next[exIdx] = ex;
+      persistSession(next);
+      return next;
+    });
+  };
+
   const logSet = (restSeconds: number) => {
     timer.start(restSeconds);
   };
@@ -376,9 +404,14 @@ export function TodayScreen() {
 
         return (
           <div className="exercise-card" key={`${es.exerciseId}-${exIdx}`}>
-            <div className="exercise-card-header">
-              <div style={{ flex: 1 }}>
-                <h3>{exercise.name}</h3>
+            <div className="exercise-card-header" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0 }}>{exercise.name}</h3>
+                  <span className={`badge badge-${es.suggestionReason === 'increase' ? 'green' : es.suggestionReason === 'deload' ? 'red' : 'accent'}`}>
+                    {es.suggestionReason === 'increase' ? 'Progress' : es.suggestionReason === 'deload' ? 'Deload' : es.suggestionReason === 'first' ? 'New' : 'Hold'}
+                  </span>
+                </div>
                 <div className="suggestion">
                   {es.repRange[0]}–{es.repRange[1]} reps &middot; {es.numSets} sets
                   {es.suggestedWeight > 0 && (
@@ -388,7 +421,7 @@ export function TodayScreen() {
                   )}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <button
                     className="btn btn-sm"
@@ -412,15 +445,16 @@ export function TodayScreen() {
                 <button
                   className="btn btn-sm"
                   style={{ padding: '4px', minHeight: 0, color: 'var(--red)' }}
-                  onClick={() => removeExerciseFromSession(exIdx)}
+                  onClick={() => {
+                    if (confirm(`Remove ${exercise.name} from this session?`)) {
+                      removeExerciseFromSession(exIdx);
+                    }
+                  }}
                   aria-label="Remove exercise"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={14} />
                 </button>
               </div>
-              <span className={`badge badge-${es.suggestionReason === 'increase' ? 'green' : es.suggestionReason === 'deload' ? 'red' : 'accent'}`}>
-                {es.suggestionReason === 'increase' ? 'Progress' : es.suggestionReason === 'deload' ? 'Deload' : es.suggestionReason === 'first' ? 'New' : 'Hold'}
-              </span>
             </div>
 
             <div className="set-labels">
@@ -458,10 +492,28 @@ export function TodayScreen() {
                   onClick={() => toggleWorking(exIdx, setIdx)}
                   aria-label={set.isWorkingSet ? 'Working set' : 'Warm-up set'}
                 >
-                  {set.isWorkingSet ? 'W' : '—'}
+                  {set.isWorkingSet ? 'W' : 'WU'}
                 </button>
               </div>
             ))}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button
+                className="btn btn-sm btn-secondary"
+                style={{ flex: 1, fontSize: 12, padding: '6px 0', minHeight: 0 }}
+                onClick={() => removeLastSet(exIdx)}
+                disabled={es.sets.length <= 1}
+              >
+                − Remove Set
+              </button>
+              <button
+                className="btn btn-sm btn-secondary"
+                style={{ flex: 1, fontSize: 12, padding: '6px 0', minHeight: 0 }}
+                onClick={() => addSet(exIdx)}
+              >
+                + Add Set
+              </button>
+            </div>
 
             {avgE10rm > 0 && (
               <div className="e10rm">
