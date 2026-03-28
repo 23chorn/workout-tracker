@@ -20,9 +20,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body, #root {
-  height: 100dvh;
+html {
   height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -30,10 +35,9 @@ html, body, #root {
   overscroll-behavior: none;
 }
 
-@supports (height: 100dvh) {
-  html, body, #root {
-    height: 100dvh;
-  }
+#root {
+  height: 100%;
+  background: var(--bg);
 }
 
 button {
@@ -107,8 +111,18 @@ select {
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: center;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 100;
+}
+
+.tab-bar::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-bottom, 0px);
+  background: var(--bg-card);
 }
 
 .tab-bar-inner {
