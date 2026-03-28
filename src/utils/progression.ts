@@ -7,8 +7,11 @@ interface Suggestion {
 
 export async function getSuggestion(
   exerciseId: number,
-  repRangeMax: number
+  repRangeMax: number,
+  repRangeMin?: number
 ): Promise<Suggestion> {
+  const min = repRangeMin ?? Math.max(1, repRangeMax - 4);
+
   const sessions = await db.sessions
     .orderBy('date')
     .reverse()
@@ -37,14 +40,15 @@ export async function getSuggestion(
     return { weight: latestWeight + 2.5, reason: 'increase' };
   }
 
+  // Deload: only if reps fell BELOW the rep range minimum in two consecutive sessions
   if (relevant.length >= 2) {
     const prev = relevant[1];
     const prevEx = prev.exercises.find(e => e.exerciseId === exerciseId);
     if (prevEx) {
       const prevWorking = prevEx.sets.filter(s => s.isWorkingSet);
-      const prevMissed = prevWorking.some(s => s.reps < repRangeMax);
-      const latestMissed = workingSets.some(s => s.reps < repRangeMax);
-      if (prevMissed && latestMissed) {
+      const prevFailed = prevWorking.some(s => s.reps < min);
+      const latestFailed = workingSets.some(s => s.reps < min);
+      if (prevFailed && latestFailed) {
         return { weight: Math.round(latestWeight * 0.9 * 2) / 2, reason: 'deload' };
       }
     }

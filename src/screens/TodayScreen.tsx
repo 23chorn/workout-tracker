@@ -6,107 +6,8 @@ import { calcE10RM, sessionE10RM } from '../utils/e10rm';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
 import { Check, X, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
-
-function relativeTime(date: Date): string {
-  const now = Date.now();
-  const diff = now - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return 'Today';
-  if (days === 1) return '1D';
-  if (days < 7) return `${days}D`;
-  const weeks = Math.round(days / 7);
-  if (weeks <= 4) return `${weeks}W`;
-  const months = Math.round(days / 30);
-  if (months < 12) return `${months}M`;
-  const years = Math.round(days / 365);
-  return `${years}Y`;
-}
-
-function AddExerciseModal({ exercises, sessionMuscleGroups, onAdd, onClose }: {
-  exercises: Exercise[];
-  sessionMuscleGroups: Set<string>;
-  onAdd: (id: number) => void;
-  onClose: () => void;
-}) {
-  const sessions = useLiveQuery(() => db.sessions.orderBy('date').reverse().toArray()) ?? [];
-  const [search, setSearch] = useState('');
-
-  const lastCompleted = new Map<number, Date>();
-  for (const s of sessions) {
-    for (const ex of s.exercises) {
-      if (!lastCompleted.has(ex.exerciseId)) {
-        lastCompleted.set(ex.exerciseId, new Date(s.date));
-      }
-    }
-  }
-
-  const isSearching = search.trim().length > 0;
-
-  // When not searching, show suggested exercises (matching session muscle groups)
-  const suggested = exercises
-    .filter(e => sessionMuscleGroups.has(e.muscleGroup) || (e.secondaryMuscleGroup && sessionMuscleGroups.has(e.secondaryMuscleGroup)))
-    .slice(0, 10);
-
-  const filtered = isSearching
-    ? exercises.filter(e =>
-        e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.muscleGroup.toLowerCase().includes(search.toLowerCase()) ||
-        (e.secondaryMuscleGroup?.toLowerCase().includes(search.toLowerCase()))
-      )
-    : suggested;
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2>Add Exercise</h2>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search all exercises..."
-          style={{ marginBottom: 12 }}
-          autoFocus
-        />
-        {!isSearching && suggested.length > 0 && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-            Suggested
-          </div>
-        )}
-        <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-          {filtered.map(ex => {
-            const last = lastCompleted.get(ex.id!);
-            return (
-              <button
-                key={ex.id}
-                className="list-item"
-                style={{ width: '100%' }}
-                onClick={() => onAdd(ex.id!)}
-              >
-                <div style={{ textAlign: 'left' }}>
-                  <div className="title">{ex.name}</div>
-                  <div className="subtitle">{ex.muscleGroup}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  {last && (
-                    <span style={{
-                      fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-input)',
-                      padding: '2px 6px', borderRadius: 4, fontWeight: 600,
-                    }}>
-                      {relativeTime(last)}
-                    </span>
-                  )}
-                  <Plus size={16} color="var(--accent)" />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <button className="btn btn-secondary btn-full mt-md" onClick={onClose}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ExercisePicker } from '../components/ExercisePicker';
 
 interface ExerciseState {
   exerciseId: number;
@@ -116,6 +17,7 @@ interface ExerciseState {
   suggestionReason: string;
   repRange: [number, number];
   numSets: number;
+  lastSession?: { weight: number; reps: number[] };
 }
 
 export function TodayScreen() {
@@ -135,6 +37,7 @@ export function TodayScreen() {
   const [viewingExerciseId, setViewingExerciseId] = useState<number | null>(null);
   const [confirmedSets, setConfirmedSets] = useState<Set<string>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
 
@@ -247,9 +150,17 @@ export function TodayScreen() {
     const exList = await db.exercises.where('id').anyOf(exIds).toArray();
     setExercises(new Map(exList.map(e => [e.id!, e])));
 
+    const prevSessions = await db.sessions.orderBy('date').reverse().toArray();
     const states: ExerciseState[] = [];
     for (const we of w.exercises) {
-      const suggestion = await getSuggestion(we.exerciseId, we.repRange[1]);
+      const suggestion = await getSuggestion(we.exerciseId, we.repRange[1], we.repRange[0]);
+      // Find last session's working sets for this exercise
+      const prevSession = prevSessions.find(s => s.exercises.some(e => e.exerciseId === we.exerciseId));
+      const prevEx = prevSession?.exercises.find(e => e.exerciseId === we.exerciseId);
+      const prevWorking = prevEx?.sets.filter(s => s.isWorkingSet) ?? [];
+      const lastSession = prevWorking.length > 0
+        ? { weight: prevWorking[0].weight, reps: prevWorking.map(s => s.reps) }
+        : undefined;
       states.push({
         exerciseId: we.exerciseId,
         sets: Array.from({ length: we.sets }, () => ({
@@ -262,6 +173,7 @@ export function TodayScreen() {
         suggestionReason: suggestion.reason,
         repRange: we.repRange,
         numSets: we.sets,
+        lastSession,
       });
     }
 
@@ -334,7 +246,14 @@ export function TodayScreen() {
       next.set(ex.id!, ex);
       return next;
     });
-    const suggestion = await getSuggestion(exerciseId, 12);
+    const suggestion = await getSuggestion(exerciseId, 12, 8);
+    const prevSessions = await db.sessions.orderBy('date').reverse().toArray();
+    const prevSession = prevSessions.find(s => s.exercises.some(e => e.exerciseId === exerciseId));
+    const prevEx = prevSession?.exercises.find(e => e.exerciseId === exerciseId);
+    const prevWorking = prevEx?.sets.filter(s => s.isWorkingSet) ?? [];
+    const lastSession = prevWorking.length > 0
+      ? { weight: prevWorking[0].weight, reps: prevWorking.map(s => s.reps) }
+      : undefined;
     const newState: ExerciseState = {
       exerciseId,
       sets: Array.from({ length: 3 }, () => ({
@@ -347,6 +266,7 @@ export function TodayScreen() {
       suggestionReason: suggestion.reason,
       repRange: [8, 12],
       numSets: 3,
+      lastSession,
     };
     setExerciseStates(prev => {
       const next = [...prev, newState];
@@ -402,15 +322,21 @@ export function TodayScreen() {
     }
   };
 
-  const cancelSession = async () => {
-    if (!confirm('Discard this session?')) return;
-    await db.activeSession.clear();
-    setSessionActive(false);
-    setExerciseStates([]);
-    setSelectedDayLabel(null);
-    setConfirmedSets(new Set());
-    setCollapsedExercises(new Set());
-    timer.clear();
+  const cancelSession = () => {
+    setConfirmAction({
+      title: 'Discard Session',
+      message: 'All progress in this session will be lost.',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        await db.activeSession.clear();
+        setSessionActive(false);
+        setExerciseStates([]);
+        setSelectedDayLabel(null);
+        setConfirmedSets(new Set());
+        setCollapsedExercises(new Set());
+        timer.clear();
+      },
+    });
   };
 
   const completeSession = async () => {
@@ -660,6 +586,11 @@ export function TodayScreen() {
                       {es.suggestedWeight}kg</>
                   )}
                 </div>
+                {es.lastSession && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    Last: {es.lastSession.weight}kg &times; {es.lastSession.reps.join(', ')}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -686,9 +617,11 @@ export function TodayScreen() {
                   className="btn btn-sm"
                   style={{ padding: '4px', minHeight: 0, color: 'var(--red)' }}
                   onClick={() => {
-                    if (confirm(`Remove ${exercise.name} from this session?`)) {
-                      removeExerciseFromSession(exIdx);
-                    }
+                    setConfirmAction({
+                      title: 'Remove Exercise',
+                      message: `Remove ${exercise.name} from this session?`,
+                      onConfirm: () => { setConfirmAction(null); removeExerciseFromSession(exIdx); },
+                    });
                   }}
                   aria-label="Remove exercise"
                 >
@@ -831,16 +764,28 @@ export function TodayScreen() {
       </button>
 
       {showAddExercise && (
-        <AddExerciseModal
+        <ExercisePicker
           exercises={allExercises.filter(ex => !exerciseStates.some(es => es.exerciseId === ex.id))}
-          sessionMuscleGroups={new Set(
+          suggestBy={{ muscleGroups: new Set(
             exerciseStates.flatMap(es => {
               const ex = exercises.get(es.exerciseId);
               return ex ? [ex.muscleGroup, ...(ex.secondaryMuscleGroup ? [ex.secondaryMuscleGroup] : [])] : [];
             })
-          )}
+          )}}
           onAdd={(id) => addExerciseToSession(id)}
           onClose={() => setShowAddExercise(false)}
+        />
+      )}
+
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          confirmLabel="Yes"
+          cancelLabel="No"
+          destructive
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
     </div>

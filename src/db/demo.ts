@@ -1,4 +1,4 @@
-import { db } from './database';
+import { db, switchDB } from './database';
 import { seedDatabase } from './seed';
 import { sessionE10RM } from '../utils/e10rm';
 
@@ -10,25 +10,19 @@ export function isDemoMode(): boolean {
 
 export async function enableDemo(): Promise<void> {
   localStorage.setItem(DEMO_FLAG_KEY, '1');
-  await clearAll();
-  await seedDatabase();
-  await generateDemoData();
+  switchDB(true);
+  // Only generate demo data if the demo DB is empty
+  const count = await db.sessions.count();
+  if (count === 0) {
+    await seedDatabase();
+    await generateDemoData();
+  }
 }
 
 export async function disableDemo(): Promise<void> {
   localStorage.removeItem(DEMO_FLAG_KEY);
-  await clearAll();
+  switchDB(false);
   await seedDatabase();
-}
-
-async function clearAll() {
-  await db.transaction('rw', [db.exercises, db.workouts, db.programs, db.sessions, db.activeSession], async () => {
-    await db.exercises.clear();
-    await db.workouts.clear();
-    await db.programs.clear();
-    await db.sessions.clear();
-    await db.activeSession.clear();
-  });
 }
 
 // Helpers

@@ -76,7 +76,7 @@ export interface ActiveSession {
   restTimerTotal?: number;
 }
 
-const db = new Dexie('LiftDB') as Dexie & {
+type LiftDB = Dexie & {
   exercises: EntityTable<Exercise, 'id'>;
   workouts: EntityTable<Workout, 'id'>;
   programs: EntityTable<Program, 'id'>;
@@ -84,27 +84,44 @@ const db = new Dexie('LiftDB') as Dexie & {
   activeSession: EntityTable<ActiveSession, 'id'>;
 };
 
-db.version(1).stores({
-  exercises: '++id, name, muscleGroup',
-  workouts: '++id, name',
-  programs: '++id, name',
-  sessions: '++id, date, programId, workoutId',
-});
+function createDB(name: string): LiftDB {
+  const d = new Dexie(name) as LiftDB;
+  d.version(1).stores({
+    exercises: '++id, name, muscleGroup',
+    workouts: '++id, name',
+    programs: '++id, name',
+    sessions: '++id, date, programId, workoutId',
+  });
+  d.version(2).stores({
+    exercises: '++id, name, muscleGroup',
+    workouts: '++id, name',
+    programs: '++id, name',
+    sessions: '++id, date, programId, workoutId',
+    activeSession: '++id',
+  });
+  d.version(3).stores({
+    exercises: '++id, name, muscleGroup',
+    workouts: '++id, name',
+    programs: '++id, name',
+    sessions: '++id, date, programId, workoutId',
+    activeSession: '++id',
+  });
+  return d;
+}
 
-db.version(2).stores({
-  exercises: '++id, name, muscleGroup',
-  workouts: '++id, name',
-  programs: '++id, name',
-  sessions: '++id, date, programId, workoutId',
-  activeSession: '++id',
-});
+const DEMO_FLAG = 'lift-demo-mode';
+const isDemo = localStorage.getItem(DEMO_FLAG) === '1';
 
-db.version(3).stores({
-  exercises: '++id, name, muscleGroup',
-  workouts: '++id, name',
-  programs: '++id, name',
-  sessions: '++id, date, programId, workoutId',
-  activeSession: '++id',
-});
+const _state = { db: createDB(isDemo ? 'LiftDB-Demo' : 'LiftDB') };
 
-export { db };
+export function switchDB(demo: boolean) {
+  _state.db.close();
+  _state.db = createDB(demo ? 'LiftDB-Demo' : 'LiftDB');
+}
+
+// Use a proxy so all imports always reference the current DB instance
+export const db: LiftDB = new Proxy({} as LiftDB, {
+  get(_target, prop) {
+    return (_state.db as any)[prop];
+  },
+});

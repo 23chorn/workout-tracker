@@ -4,7 +4,9 @@ import { db, type Workout, type WorkoutExercise, type Program, type ProgramDay }
 import { exportData, importData } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
 import { ExerciseDetail } from '../components/ExerciseDetail';
-import { Plus, Trash2, Download, Upload, X, FlaskConical, Camera, Dumbbell } from 'lucide-react';
+import { Plus, Trash2, Download, Upload, X, FlaskConical, Camera, Dumbbell, Check } from 'lucide-react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ExercisePicker } from '../components/ExercisePicker';
 
 type Tab = 'exercises' | 'workouts' | 'programs';
 
@@ -80,15 +82,52 @@ function ExerciseManager() {
   };
 
   const [search, setSearch] = useState('');
-  const filtered = search.trim()
-    ? exercises.filter(e =>
-        e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.muscleGroup.toLowerCase().includes(search.toLowerCase()) ||
-        (e.secondaryMuscleGroup?.toLowerCase().includes(search.toLowerCase()))
-      )
-    : exercises;
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
+  const allMuscleGroups = [...new Set(exercises.flatMap(e => [e.muscleGroup, ...(e.secondaryMuscleGroup ? [e.secondaryMuscleGroup] : [])]))].sort();
+
+  const filtered = (() => {
+    let list = exercises;
+    if (muscleFilter) {
+      list = list.filter(e => e.muscleGroup === muscleFilter || e.secondaryMuscleGroup === muscleFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(e =>
+        e.name.toLowerCase().includes(q) ||
+        e.muscleGroup.toLowerCase().includes(q) ||
+        (e.secondaryMuscleGroup?.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  })();
   const groups = [...new Set(filtered.map(e => e.muscleGroup))].sort();
+  const [editingFields, setEditingFields] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editMuscle, setEditMuscle] = useState('');
+  const [editSecondary, setEditSecondary] = useState('');
+  const [editRest, setEditRest] = useState('');
+
   const viewing = viewingExercise !== null ? exercises.find(e => e.id === viewingExercise) : null;
+
+  const startEditing = () => {
+    if (!viewing) return;
+    setEditName(viewing.name);
+    setEditMuscle(viewing.muscleGroup);
+    setEditSecondary(viewing.secondaryMuscleGroup ?? '');
+    setEditRest(String(viewing.defaultRestSeconds));
+    setEditingFields(true);
+  };
+
+  const saveEditing = async () => {
+    if (!viewing || !editName.trim()) return;
+    await db.exercises.update(viewing.id!, {
+      name: editName.trim(),
+      muscleGroup: editMuscle.trim(),
+      secondaryMuscleGroup: editSecondary.trim() || undefined,
+      defaultRestSeconds: parseInt(editRest) || 90,
+    });
+    setEditingFields(false);
+  };
 
   if (viewing) {
     return (
@@ -96,8 +135,37 @@ function ExerciseManager() {
         <ExerciseDetail
           exerciseId={viewing.id!}
           backLabel="Exercises"
-          onBack={closeExercise}
+          onBack={() => { closeExercise(); setEditingFields(false); }}
         >
+          {editingFields ? (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="form-group">
+                <label>Name</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Primary Muscle Group</label>
+                <input value={editMuscle} onChange={e => setEditMuscle(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Secondary Muscle Group</label>
+                <input value={editSecondary} onChange={e => setEditSecondary(e.target.value)} placeholder="Optional" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Default Rest (seconds)</label>
+                <input type="number" value={editRest} onChange={e => setEditRest(e.target.value)} />
+              </div>
+              <div className="modal-actions" style={{ marginTop: 12 }}>
+                <button className="btn btn-secondary" onClick={() => setEditingFields(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={saveEditing}>Save</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn-secondary btn-full mb-md" onClick={startEditing}>
+              Edit Details
+            </button>
+          )}
+
           {viewing.imageUrl ? (
             <div style={{ marginBottom: 16 }}>
               <img
@@ -148,10 +216,28 @@ function ExerciseManager() {
 
       <input
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={e => { setSearch(e.target.value); if (e.target.value) setMuscleFilter(null); }}
         placeholder="Search exercises..."
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: 8 }}
       />
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        {allMuscleGroups.map(mg => (
+          <button
+            key={mg}
+            onClick={() => { setMuscleFilter(muscleFilter === mg ? null : mg); setSearch(''); }}
+            style={{
+              padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              border: '1px solid var(--border)',
+              background: muscleFilter === mg ? 'var(--accent)' : 'var(--bg-input)',
+              color: muscleFilter === mg ? 'white' : 'var(--text-muted)',
+              cursor: 'pointer',
+            }}
+          >
+            {mg}
+          </button>
+        ))}
+      </div>
 
       {showAdd && (
         <div className="modal-overlay" onClick={() => setShowAdd(false)}>
@@ -222,6 +308,7 @@ function WorkoutManager() {
   const [editing, setEditing] = useState<Workout | null>(null);
   const [name, setName] = useState('');
   const [wExercises, setWExercises] = useState<WorkoutExercise[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
 
   const startNew = () => {
     setName('');
@@ -272,8 +359,11 @@ function WorkoutManager() {
     setEditing(null);
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
   const deleteWorkout = async (id: number) => {
     await db.workouts.delete(id);
+    setConfirmDeleteId(null);
   };
 
   if (editing) {
@@ -291,15 +381,18 @@ function WorkoutManager() {
           <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Upper Body A" />
         </div>
 
-        <div className="form-group">
-          <label>Add Exercise</label>
-          <select onChange={e => { addExercise(Number(e.target.value)); e.target.value = ''; }} value="">
-            <option value="">Pick an exercise...</option>
-            {exercises.map(ex => (
-              <option key={ex.id} value={ex.id}>{ex.name}</option>
-            ))}
-          </select>
-        </div>
+        <button className="btn btn-secondary btn-full mb-md" onClick={() => setShowPicker(true)}>
+          <Plus size={16} /> Add Exercise
+        </button>
+
+        {showPicker && (
+          <ExercisePicker
+            exercises={exercises.filter(ex => !wExercises.some(we => we.exerciseId === ex.id))}
+            suggestBy="recent"
+            onAdd={(id) => { addExercise(id); setShowPicker(false); }}
+            onClose={() => setShowPicker(false)}
+          />
+        )}
 
         {wExercises.map((we, idx) => {
           const ex = exercises.find(e => e.id === we.exerciseId);
@@ -358,11 +451,22 @@ function WorkoutManager() {
               <div className="title">{w.name}</div>
               <div className="subtitle">{w.exercises.length} exercises</div>
             </div>
-            <button onClick={e => { e.stopPropagation(); deleteWorkout(w.id!); }} style={{ color: 'var(--red)', padding: 8 }}>
+            <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(w.id!); }} style={{ color: 'var(--red)', padding: 8 }}>
               <Trash2 size={16} />
             </button>
           </div>
         ))
+      )}
+
+      {confirmDeleteId !== null && (
+        <ConfirmDialog
+          title="Delete Workout"
+          message="This workout will be permanently deleted."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => deleteWorkout(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
       )}
     </div>
   );
@@ -520,8 +624,126 @@ function ProgramManager() {
   );
 }
 
+function HelpSection() {
+  return (
+    <div>
+      <h2>Progression Badges</h2>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+        Each exercise in your workout shows a badge indicating what the progression logic suggests.
+      </p>
+
+      <div className="card" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span className="badge badge-green" style={{ flexShrink: 0, marginTop: 2, width: 64, textAlign: 'center' }}>Progress</span>
+        <div style={{ fontSize: 13 }}>
+          <strong>Increase weight</strong>
+          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+            All working sets hit the top of the rep range last session. Suggests +2.5kg.
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span className="badge badge-accent" style={{ flexShrink: 0, marginTop: 2, width: 64, textAlign: 'center' }}>Hold</span>
+        <div style={{ fontSize: 13 }}>
+          <strong>Stay at current weight</strong>
+          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+            Reps were within range but not all sets hit the top. Keep pushing at this weight.
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span className="badge badge-red" style={{ flexShrink: 0, marginTop: 2, width: 64, textAlign: 'center' }}>Deload</span>
+        <div style={{ fontSize: 13 }}>
+          <strong>Reduce weight by 10%</strong>
+          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+            Reps were missed for two consecutive sessions. Suggests dropping to 90% of current weight to rebuild.
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <span className="badge badge-accent" style={{ flexShrink: 0, marginTop: 2, width: 64, textAlign: 'center' }}>New</span>
+        <div style={{ fontSize: 13 }}>
+          <strong>No previous data</strong>
+          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+            First time doing this exercise. No suggestion — pick a starting weight.
+          </div>
+        </div>
+      </div>
+
+      <h2 style={{ marginTop: 24 }}>Set Confirmation</h2>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+        The tick button next to each set has three states:
+      </p>
+
+      <div className="card">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg-input)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Check size={14} color="var(--text-muted)" />
+            </div>
+            <div style={{ fontSize: 13 }}><strong>Empty</strong> — enter weight and reps first</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Check size={14} color="white" />
+            </div>
+            <div style={{ fontSize: 13 }}><strong>Ready</strong> — tap to confirm and start rest timer</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Check size={14} color="white" />
+            </div>
+            <div style={{ fontSize: 13 }}><strong>Confirmed</strong> — set is logged</div>
+          </div>
+        </div>
+      </div>
+
+      <h2 style={{ marginTop: 24 }}>Working Sets vs Warm-ups</h2>
+      <div className="card">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'white' }}>
+              W
+            </div>
+            <div style={{ fontSize: 13 }}><strong>Working set</strong> — counts toward e10RM and progression</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--bg-input)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>
+              WU
+            </div>
+            <div style={{ fontSize: 13 }}><strong>Warm-up</strong> — logged but excluded from calculations</div>
+          </div>
+        </div>
+      </div>
+
+      <h2 style={{ marginTop: 24 }}>e10RM</h2>
+      <div className="card">
+        <p style={{ fontSize: 13, lineHeight: 1.6 }}>
+          <strong>Estimated 10-rep max</strong> — a normalised strength metric that lets you compare performance across different weight/rep combinations.
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.6 }}>
+          Per set: weight x (1 + reps / 30) / 1.333
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>
+          Session average: mean of all working sets for that exercise. Plotted over time in the exercise detail view. PB flagged when session average beats your all-time best.
+        </p>
+      </div>
+
+      <h2 style={{ marginTop: 24 }}>Data</h2>
+      <div className="card">
+        <p style={{ fontSize: 13, lineHeight: 1.6 }}>
+          All data is stored locally on your device in the browser. Nothing is sent to a server. Use the export/import buttons at the top of this screen to back up your data as a JSON file.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ManageScreen() {
   const [tab, setTab] = useState<Tab>('exercises');
+  const [showHelp, setShowHelp] = useState(false);
   const [demo, setDemo] = useState(isDemoMode);
   const [demoLoading, setDemoLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -541,17 +763,25 @@ export function ManageScreen() {
     }
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSuccess, setImportSuccess] = useState<boolean | null>(null);
+
+  const handleImportSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!confirm('This will overwrite all existing data. Continue?')) return;
-    try {
-      await importData(file);
-      alert('Import successful!');
-    } catch {
-      alert('Import failed — invalid file.');
-    }
+    setImportFile(file);
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importFile) return;
+    try {
+      await importData(importFile);
+      setImportSuccess(true);
+    } catch {
+      setImportSuccess(false);
+    }
+    setImportFile(null);
   };
 
   return (
@@ -565,7 +795,12 @@ export function ManageScreen() {
           <button className="btn btn-sm btn-secondary" onClick={() => fileRef.current?.click()}>
             <Upload size={14} />
           </button>
-          <input ref={fileRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+          <button className="btn btn-sm btn-secondary" onClick={() => setShowHelp(true)}
+            style={{ fontWeight: 700, fontSize: 16, width: 36, padding: 0 }}
+          >
+            ?
+          </button>
+          <input ref={fileRef} type="file" accept=".json" onChange={handleImportSelect} style={{ display: 'none' }} />
         </div>
       </div>
 
@@ -590,6 +825,43 @@ export function ManageScreen() {
       {tab === 'exercises' && <ExerciseManager />}
       {tab === 'workouts' && <WorkoutManager />}
       {tab === 'programs' && <ProgramManager />}
+
+      {showHelp && (
+        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
+            <div className="row-between mb-md">
+              <h2 style={{ marginBottom: 0 }}>Help</h2>
+              <button className="btn btn-sm btn-secondary" onClick={() => setShowHelp(false)}>
+                <X size={14} />
+              </button>
+            </div>
+            <HelpSection />
+          </div>
+        </div>
+      )}
+
+      {importFile && (
+        <ConfirmDialog
+          title="Import Data"
+          message="This will overwrite all existing data. Are you sure?"
+          confirmLabel="Import"
+          destructive
+          onConfirm={handleImportConfirm}
+          onCancel={() => setImportFile(null)}
+        />
+      )}
+
+      {importSuccess !== null && (
+        <div className="modal-overlay" onClick={() => setImportSuccess(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
+            <h2>{importSuccess ? 'Import Successful' : 'Import Failed'}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20 }}>
+              {importSuccess ? 'All data has been restored.' : 'The file could not be read.'}
+            </p>
+            <button className="btn btn-primary btn-full" onClick={() => setImportSuccess(null)}>OK</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
