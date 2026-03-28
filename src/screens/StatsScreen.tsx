@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Session } from '../db/database';
+import { ExerciseDetail } from '../components/ExerciseDetail';
 import { Flame, Dumbbell, Target, TrendingUp, Trophy, Calendar } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, sub }: {
@@ -75,7 +76,10 @@ function WeeklyChart({ sessions }: { sessions: Session[] }) {
   );
 }
 
-function PersonalBests({ sessions }: { sessions: Session[] }) {
+function PersonalBests({ sessions, onSelectExercise }: {
+  sessions: Session[];
+  onSelectExercise: (id: number, name: string, best: number) => void;
+}) {
   const allExercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
   const exMap = new Map(allExercises.map(e => [e.id!, e]));
 
@@ -91,7 +95,7 @@ function PersonalBests({ sessions }: { sessions: Session[] }) {
       }
     }
     return [...map.entries()]
-      .map(([id, data]) => ({ name: exMap.get(id)?.name ?? 'Unknown', ...data }))
+      .map(([id, data]) => ({ id, name: exMap.get(id)?.name ?? 'Unknown', ...data }))
       .sort((a, b) => b.e10RM - a.e10RM)
       .slice(0, 10);
   }, [sessions, exMap]);
@@ -104,8 +108,13 @@ function PersonalBests({ sessions }: { sessions: Session[] }) {
         <Trophy size={18} color="var(--yellow)" /> Personal Bests (e10RM)
       </h2>
       {bests.map((pb, i) => (
-        <div key={i} className="list-item" style={{ cursor: 'default' }}>
-          <div>
+        <button
+          key={i}
+          className="list-item"
+          style={{ width: '100%' }}
+          onClick={() => onSelectExercise(pb.id, pb.name, pb.e10RM)}
+        >
+          <div style={{ textAlign: 'left' }}>
             <div className="title">{pb.name}</div>
             <div className="subtitle">
               {new Date(pb.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -114,7 +123,7 @@ function PersonalBests({ sessions }: { sessions: Session[] }) {
           <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
             {pb.e10RM.toFixed(1)}
           </span>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -122,6 +131,7 @@ function PersonalBests({ sessions }: { sessions: Session[] }) {
 
 export function StatsScreen() {
   const sessions = useLiveQuery(() => db.sessions.orderBy('date').reverse().toArray()) ?? [];
+  const [selectedExercise, setSelectedExercise] = useState<{ id: number; name: string; best: number } | null>(null);
 
   const stats = useMemo(() => {
     let totalSets = 0;
@@ -193,6 +203,18 @@ export function StatsScreen() {
     return `${Math.round(kg)} kg`;
   };
 
+  if (selectedExercise) {
+    return (
+      <div className="screen">
+        <ExerciseDetail
+          exerciseId={selectedExercise.id}
+          backLabel="Personal Bests"
+          onBack={() => setSelectedExercise(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="screen">
       <h1>Stats</h1>
@@ -223,7 +245,10 @@ export function StatsScreen() {
           <WeeklyChart sessions={sessions} />
 
           <div style={{ marginTop: 16 }}>
-            <PersonalBests sessions={sessions} />
+            <PersonalBests
+              sessions={sessions}
+              onSelectExercise={(id, name, best) => setSelectedExercise({ id, name, best })}
+            />
           </div>
         </>
       )}

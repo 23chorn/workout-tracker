@@ -3,28 +3,139 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Workout, type WorkoutExercise, type Program, type ProgramDay } from '../db/database';
 import { exportData, importData } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
-import { Plus, Trash2, Download, Upload, X, FlaskConical } from 'lucide-react';
+import { ExerciseDetail } from '../components/ExerciseDetail';
+import { Plus, Trash2, Download, Upload, X, FlaskConical, Camera, Dumbbell } from 'lucide-react';
 
 type Tab = 'exercises' | 'workouts' | 'programs';
+
+function resizeImage(file: File, maxSize: number): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxSize) { height *= maxSize / width; width = maxSize; }
+        } else {
+          if (height > maxSize) { width *= maxSize / height; height = maxSize; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target!.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function ExerciseManager() {
   const exercises = useLiveQuery(() => db.exercises.orderBy('name').toArray()) ?? [];
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState('');
+  const [secondaryMuscleGroup, setSecondaryMuscleGroup] = useState('');
   const [rest, setRest] = useState('90');
+  const [viewingExercise, setViewingExercise] = useState<number | null>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef(0);
+
+  const openExercise = (id: number) => {
+    const screenEl = document.querySelector('.screen');
+    scrollRef.current = screenEl?.scrollTop ?? 0;
+    setViewingExercise(id);
+  };
+
+  const closeExercise = () => {
+    setViewingExercise(null);
+    requestAnimationFrame(() => {
+      const screenEl = document.querySelector('.screen');
+      if (screenEl) screenEl.scrollTop = scrollRef.current;
+    });
+  };
 
   const addExercise = async () => {
     if (!name.trim()) return;
     await db.exercises.add({
       name: name.trim(),
       muscleGroup: muscleGroup.trim(),
+      secondaryMuscleGroup: secondaryMuscleGroup.trim() || undefined,
       defaultRestSeconds: parseInt(rest) || 90,
     });
-    setName(''); setMuscleGroup(''); setRest('90'); setShowAdd(false);
+    setName(''); setMuscleGroup(''); setSecondaryMuscleGroup(''); setRest('90'); setShowAdd(false);
   };
 
-  const groups = [...new Set(exercises.map(e => e.muscleGroup))].sort();
+  const handlePhoto = async (exId: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await resizeImage(file, 400);
+    await db.exercises.update(exId, { imageUrl: dataUrl });
+  };
+
+  const removePhoto = async (exId: number) => {
+    await db.exercises.update(exId, { imageUrl: undefined });
+  };
+
+  const [search, setSearch] = useState('');
+  const filtered = search.trim()
+    ? exercises.filter(e =>
+        e.name.toLowerCase().includes(search.toLowerCase()) ||
+        e.muscleGroup.toLowerCase().includes(search.toLowerCase()) ||
+        (e.secondaryMuscleGroup?.toLowerCase().includes(search.toLowerCase()))
+      )
+    : exercises;
+  const groups = [...new Set(filtered.map(e => e.muscleGroup))].sort();
+  const viewing = viewingExercise !== null ? exercises.find(e => e.id === viewingExercise) : null;
+
+  if (viewing) {
+    return (
+      <div>
+        <ExerciseDetail
+          exerciseId={viewing.id!}
+          backLabel="Exercises"
+          onBack={closeExercise}
+        >
+          {viewing.imageUrl ? (
+            <div style={{ marginBottom: 16 }}>
+              <img
+                src={viewing.imageUrl}
+                alt={viewing.name}
+                style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border)' }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={() => {
+                  photoRef.current?.click();
+                }}>
+                  <Camera size={14} /> Replace Photo
+                </button>
+                <button className="btn btn-sm btn-danger" style={{ flex: 1 }} onClick={() => removePhoto(viewing.id!)}>
+                  <Trash2 size={14} /> Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="btn btn-secondary btn-full mb-md"
+              onClick={() => photoRef.current?.click()}
+            >
+              <Camera size={16} /> Add Photo
+            </button>
+          )}
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => handlePhoto(viewing.id!, e)}
+            style={{ display: 'none' }}
+          />
+        </ExerciseDetail>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -35,6 +146,13 @@ function ExerciseManager() {
         </button>
       </div>
 
+      <input
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Search exercises..."
+        style={{ marginBottom: 12 }}
+      />
+
       {showAdd && (
         <div className="modal-overlay" onClick={() => setShowAdd(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -44,8 +162,12 @@ function ExerciseManager() {
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Barbell Row" />
             </div>
             <div className="form-group">
-              <label>Muscle Group</label>
+              <label>Primary Muscle Group</label>
               <input value={muscleGroup} onChange={e => setMuscleGroup(e.target.value)} placeholder="e.g. Back" />
+            </div>
+            <div className="form-group">
+              <label>Secondary Muscle Group (optional)</label>
+              <input value={secondaryMuscleGroup} onChange={e => setSecondaryMuscleGroup(e.target.value)} placeholder="e.g. Biceps" />
             </div>
             <div className="form-group">
               <label>Default Rest (seconds)</label>
@@ -64,13 +186,29 @@ function ExerciseManager() {
           <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
             {group}
           </div>
-          {exercises.filter(e => e.muscleGroup === group).map(ex => (
-            <div key={ex.id} className="list-item" style={{ cursor: 'default' }}>
-              <div>
-                <div className="title">{ex.name}</div>
-                <div className="subtitle">Rest: {ex.defaultRestSeconds}s</div>
-              </div>
-            </div>
+          {filtered.filter(e => e.muscleGroup === group).map(ex => (
+            <button key={ex.id} className="list-item" style={{ width: '100%', justifyContent: 'flex-start', gap: 10 }} onClick={() => openExercise(ex.id!)}>
+                {ex.imageUrl ? (
+                  <img src={ex.imageUrl} alt="" style={{
+                    width: 36, height: 36, borderRadius: 6, objectFit: 'cover',
+                    border: '1px solid var(--border)', flexShrink: 0,
+                  }} />
+                ) : (
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 6, background: 'var(--bg-input)',
+                    border: '1px solid var(--border)', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Dumbbell size={14} color="var(--text-muted)" />
+                  </div>
+                )}
+                <div style={{ textAlign: 'left' }}>
+                  <div className="title">{ex.name}</div>
+                  <div className="subtitle">
+                    {ex.muscleGroup}{ex.secondaryMuscleGroup && ` / ${ex.secondaryMuscleGroup}`} &middot; {ex.defaultRestSeconds}s
+                  </div>
+                </div>
+            </button>
           ))}
         </div>
       ))}
@@ -235,6 +373,15 @@ function ProgramManager() {
   const workouts = useLiveQuery(() => db.workouts.toArray()) ?? [];
   const [editing, setEditing] = useState<Program | null>(null);
   const [name, setName] = useState('');
+  const [defaultProgramId, setDefaultProgramId] = useState<number | null>(() => {
+    const stored = localStorage.getItem('lift-default-program');
+    return stored ? Number(stored) : null;
+  });
+
+  const setAsDefault = (id: number) => {
+    localStorage.setItem('lift-default-program', String(id));
+    setDefaultProgramId(id);
+  };
   const [days, setDays] = useState<ProgramDay[]>([]);
 
   const startNew = () => {
@@ -250,13 +397,13 @@ function ProgramManager() {
   };
 
   const addDay = () => {
-    setDays(prev => [...prev, { label: `Day ${prev.length + 1}`, workoutId: workouts[0]?.id ?? 0 }]);
+    setDays(prev => [...prev, { label: '', workoutId: workouts[0]?.id ?? 0 }]);
   };
 
-  const updateDay = (idx: number, field: 'label' | 'workoutId', value: string | number) => {
+  const updateDayWorkout = (idx: number, workoutId: number) => {
     setDays(prev => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: value };
+      next[idx] = { ...next[idx], workoutId };
       return next;
     });
   };
@@ -267,7 +414,12 @@ function ProgramManager() {
 
   const save = async () => {
     if (!name.trim()) return;
-    const data = { name: name.trim(), days };
+    // Auto-derive day labels from workout names
+    const resolvedDays = days.map((d, i) => {
+      const wk = workouts.find(w => w.id === d.workoutId);
+      return { ...d, label: wk?.name ?? `Day ${i + 1}` };
+    });
+    const data = { name: name.trim(), days: resolvedDays };
     if (editing?.id) {
       await db.programs.update(editing.id, data);
     } else {
@@ -303,13 +455,9 @@ function ProgramManager() {
                 <Trash2 size={16} />
               </button>
             </div>
-            <div className="form-group">
-              <label>Label</label>
-              <input value={day.label} onChange={e => updateDay(idx, 'label', e.target.value)} />
-            </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Workout</label>
-              <select value={day.workoutId} onChange={e => updateDay(idx, 'workoutId', Number(e.target.value))}>
+              <select value={day.workoutId} onChange={e => updateDayWorkout(idx, Number(e.target.value))}>
                 <option value={0}>Select workout...</option>
                 {workouts.map(w => (
                   <option key={w.id} value={w.id}>{w.name}</option>
@@ -342,17 +490,31 @@ function ProgramManager() {
       {programs.length === 0 ? (
         <div className="empty"><p>No programs yet.</p></div>
       ) : (
-        programs.map(p => (
-          <div key={p.id} className="list-item" onClick={() => startEdit(p)}>
-            <div>
-              <div className="title">{p.name}</div>
-              <div className="subtitle">{p.days.length} days</div>
+        programs.map(p => {
+          const isDefault = p.id === defaultProgramId;
+          return (
+            <div key={p.id} className="list-item" onClick={() => startEdit(p)}>
+              <div style={{ flex: 1 }}>
+                <div className="title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {p.name}
+                  {isDefault && <span className="badge badge-accent">Default</span>}
+                </div>
+                <div className="subtitle">
+                  {p.days.length} days
+                  {!isDefault && (
+                    <> &middot; <span
+                      style={{ color: 'var(--accent)', cursor: 'pointer' }}
+                      onClick={e => { e.stopPropagation(); setAsDefault(p.id!); }}
+                    >Set as default</span></>
+                  )}
+                </div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); deleteProgram(p.id!); }} style={{ color: 'var(--red)', padding: 8 }}>
+                <Trash2 size={16} />
+              </button>
             </div>
-            <button onClick={e => { e.stopPropagation(); deleteProgram(p.id!); }} style={{ color: 'var(--red)', padding: 8 }}>
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );

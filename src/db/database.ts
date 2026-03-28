@@ -4,7 +4,9 @@ export interface Exercise {
   id?: number;
   name: string;
   muscleGroup: string;
+  secondaryMuscleGroup?: string;
   defaultRestSeconds: number;
+  imageUrl?: string;
 }
 
 export interface WorkoutExercise {
@@ -69,6 +71,9 @@ export interface ActiveSession {
     repRange: [number, number];
     numSets: number;
   }[];
+  confirmedSets?: string[];
+  restTimerEnd?: string;
+  restTimerTotal?: number;
 }
 
 const db = new Dexie('LiftDB') as Dexie & {
@@ -87,6 +92,14 @@ db.version(1).stores({
 });
 
 db.version(2).stores({
+  exercises: '++id, name, muscleGroup',
+  workouts: '++id, name',
+  programs: '++id, name',
+  sessions: '++id, date, programId, workoutId',
+  activeSession: '++id',
+});
+
+db.version(3).stores({
   exercises: '++id, name, muscleGroup',
   workouts: '++id, name',
   programs: '++id, name',

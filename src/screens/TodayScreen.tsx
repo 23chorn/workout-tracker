@@ -2,9 +2,111 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Exercise, type SessionSet, type SessionExercise, type ActiveSession } from '../db/database';
 import { getSuggestion } from '../utils/progression';
-import { sessionE10RM } from '../utils/e10rm';
+import { calcE10RM, sessionE10RM } from '../utils/e10rm';
+import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
 import { Check, X, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+
+function relativeTime(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return 'Today';
+  if (days === 1) return '1D';
+  if (days < 7) return `${days}D`;
+  const weeks = Math.round(days / 7);
+  if (weeks <= 4) return `${weeks}W`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months}M`;
+  const years = Math.round(days / 365);
+  return `${years}Y`;
+}
+
+function AddExerciseModal({ exercises, sessionMuscleGroups, onAdd, onClose }: {
+  exercises: Exercise[];
+  sessionMuscleGroups: Set<string>;
+  onAdd: (id: number) => void;
+  onClose: () => void;
+}) {
+  const sessions = useLiveQuery(() => db.sessions.orderBy('date').reverse().toArray()) ?? [];
+  const [search, setSearch] = useState('');
+
+  const lastCompleted = new Map<number, Date>();
+  for (const s of sessions) {
+    for (const ex of s.exercises) {
+      if (!lastCompleted.has(ex.exerciseId)) {
+        lastCompleted.set(ex.exerciseId, new Date(s.date));
+      }
+    }
+  }
+
+  const isSearching = search.trim().length > 0;
+
+  // When not searching, show suggested exercises (matching session muscle groups)
+  const suggested = exercises
+    .filter(e => sessionMuscleGroups.has(e.muscleGroup) || (e.secondaryMuscleGroup && sessionMuscleGroups.has(e.secondaryMuscleGroup)))
+    .slice(0, 10);
+
+  const filtered = isSearching
+    ? exercises.filter(e =>
+        e.name.toLowerCase().includes(search.toLowerCase()) ||
+        e.muscleGroup.toLowerCase().includes(search.toLowerCase()) ||
+        (e.secondaryMuscleGroup?.toLowerCase().includes(search.toLowerCase()))
+      )
+    : suggested;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h2>Add Exercise</h2>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search all exercises..."
+          style={{ marginBottom: 12 }}
+          autoFocus
+        />
+        {!isSearching && suggested.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+            Suggested
+          </div>
+        )}
+        <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+          {filtered.map(ex => {
+            const last = lastCompleted.get(ex.id!);
+            return (
+              <button
+                key={ex.id}
+                className="list-item"
+                style={{ width: '100%' }}
+                onClick={() => onAdd(ex.id!)}
+              >
+                <div style={{ textAlign: 'left' }}>
+                  <div className="title">{ex.name}</div>
+                  <div className="subtitle">{ex.muscleGroup}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  {last && (
+                    <span style={{
+                      fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-input)',
+                      padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+                    }}>
+                      {relativeTime(last)}
+                    </span>
+                  )}
+                  <Plus size={16} color="var(--accent)" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn btn-secondary btn-full mt-md" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface ExerciseState {
   exerciseId: number;
@@ -19,10 +121,34 @@ interface ExerciseState {
 export function TodayScreen() {
   const programs = useLiveQuery(() => db.programs.toArray()) ?? [];
   const allExercises = useLiveQuery(() => db.exercises.orderBy('name').toArray()) ?? [];
-  const [selectedProgramId, setSelectedProgramId] = useState<number | null>(null);
+  const allWorkouts = useLiveQuery(() => db.workouts.toArray()) ?? [];
+  const workoutMap = new Map(allWorkouts.map(w => [w.id!, w]));
+  const exerciseMap = new Map(allExercises.map(e => [e.id!, e]));
+
+  const getDefaultProgramId = (): number | null => {
+    const stored = localStorage.getItem('lift-default-program');
+    if (stored) return Number(stored);
+    return null;
+  };
+  const [selectedProgramId, setSelectedProgramId] = useState<number | null>(getDefaultProgramId);
   const [showAddExercise, setShowAddExercise] = useState(false);
+  const [viewingExerciseId, setViewingExerciseId] = useState<number | null>(null);
+  const [confirmedSets, setConfirmedSets] = useState<Set<string>>(new Set());
+  const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
+
+  // Auto-select default program when programs load
+  useEffect(() => {
+    if (sessionActive || programs.length === 0 || selectedProgramId !== null) return;
+    const defaultId = getDefaultProgramId();
+    if (defaultId && programs.some(p => p.id === defaultId)) {
+      setSelectedProgramId(defaultId);
+    } else if (programs[0]?.id) {
+      setSelectedProgramId(programs[0].id);
+      localStorage.setItem('lift-default-program', String(programs[0].id));
+    }
+  }, [programs, sessionActive, selectedProgramId]);
   const [exerciseStates, setExerciseStates] = useState<ExerciseState[]>([]);
   const [exercises, setExercises] = useState<Map<number, Exercise>>(new Map());
   const [workoutName, setWorkoutName] = useState('');
@@ -35,6 +161,9 @@ export function TodayScreen() {
   const selectedProgram = programs.find(p => p.id === selectedProgramId) ?? null;
 
   // Persist active session to IndexedDB (debounced)
+  const confirmedRef = useRef(confirmedSets);
+  confirmedRef.current = confirmedSets;
+
   const persistSession = useCallback((states: ExerciseState[]) => {
     if (saveRef.current) clearTimeout(saveRef.current);
     saveRef.current = setTimeout(async () => {
@@ -55,6 +184,7 @@ export function TodayScreen() {
           repRange: s.repRange,
           numSets: s.numSets,
         })),
+        confirmedSets: [...confirmedRef.current],
       };
       await db.activeSession.clear();
       await db.activeSession.add(data);
@@ -87,6 +217,20 @@ export function TodayScreen() {
         repRange: s.repRange,
         numSets: s.numSets,
       })));
+
+      // Restore confirmed sets
+      if (active.confirmedSets?.length) {
+        setConfirmedSets(new Set(active.confirmedSets));
+      }
+
+      // Restore rest timer if still running
+      if (active.restTimerEnd && active.restTimerTotal) {
+        const remaining = Math.floor((new Date(active.restTimerEnd).getTime() - Date.now()) / 1000);
+        if (remaining > 0) {
+          timer.start(remaining);
+        }
+      }
+
       setSessionActive(true);
     })();
   }, []);
@@ -248,8 +392,14 @@ export function TodayScreen() {
     });
   };
 
-  const logSet = (restSeconds: number) => {
+  const logSet = async (restSeconds: number) => {
     timer.start(restSeconds);
+    // Persist timer end time so it survives browser close
+    const endTime = new Date(Date.now() + restSeconds * 1000).toISOString();
+    const existing = await db.activeSession.toArray();
+    if (existing.length > 0) {
+      await db.activeSession.update(existing[0].id!, { restTimerEnd: endTime, restTimerTotal: restSeconds });
+    }
   };
 
   const cancelSession = async () => {
@@ -258,6 +408,8 @@ export function TodayScreen() {
     setSessionActive(false);
     setExerciseStates([]);
     setSelectedDayLabel(null);
+    setConfirmedSets(new Set());
+    setCollapsedExercises(new Set());
     timer.clear();
   };
 
@@ -291,6 +443,8 @@ export function TodayScreen() {
     setSessionActive(false);
     setExerciseStates([]);
     setSelectedDayLabel(null);
+    setConfirmedSets(new Set());
+    setCollapsedExercises(new Set());
     timer.clear();
   };
 
@@ -338,25 +492,51 @@ export function TodayScreen() {
                 <label style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, display: 'block' }}>
                   Which day?
                 </label>
-                {selectedProgram.days.map(day => (
-                  <button
-                    key={day.label}
-                    className="list-item"
-                    onClick={() => {
-                      setSelectedDayLabel(day.label);
-                      loadSession(selectedProgram.id!, selectedProgram.name, day.label, day.workoutId);
-                    }}
-                  >
-                    <div>
-                      <div className="title">{day.label}</div>
-                    </div>
-                    <ChevronRight size={18} color="var(--text-muted)" />
-                  </button>
-                ))}
+                {selectedProgram.days.map((day, dayIdx) => {
+                  const wk = workoutMap.get(day.workoutId);
+                  const exNames = wk?.exercises.map(we => exerciseMap.get(we.exerciseId)?.name).filter(Boolean) ?? [];
+                  const dayLabel = wk?.name ?? `Day ${dayIdx + 1}`;
+                  return (
+                    <button
+                      key={dayIdx}
+                      className="card"
+                      style={{ cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                      onClick={() => {
+                        setSelectedDayLabel(dayLabel);
+                        loadSession(selectedProgram.id!, selectedProgram.name, dayLabel, day.workoutId);
+                      }}
+                    >
+                      <div className="row-between" style={{ marginBottom: exNames.length > 0 ? 8 : 0 }}>
+                        <div>
+                          <div className="subtitle" style={{ marginBottom: 2 }}>Day {dayIdx + 1}</div>
+                          <div className="title">{wk?.name ?? 'No workout'}</div>
+                        </div>
+                        <ChevronRight size={18} color="var(--text-muted)" />
+                      </div>
+                      {exNames.length > 0 && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                          {exNames.join(' · ')}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </>
         )}
+      </div>
+    );
+  }
+
+  if (viewingExerciseId !== null) {
+    return (
+      <div className="screen">
+        <ExerciseDetail
+          exerciseId={viewingExerciseId}
+          backLabel="Workout"
+          onBack={() => setViewingExerciseId(null)}
+        />
       </div>
     );
   }
@@ -375,27 +555,18 @@ export function TodayScreen() {
         </button>
       </div>
 
-      {timer.active && (
-        <div className="timer-bar">
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Rest Timer</div>
-            <div className="timer-display">
-              {Math.floor(timer.remaining / 60)}:{String(timer.remaining % 60).padStart(2, '0')}
-            </div>
-            <div className="timer-progress">
-              <div
-                className="timer-progress-fill"
-                style={{ width: `${((timer.total - timer.remaining) / timer.total) * 100}%` }}
-              />
-            </div>
-          </div>
-          <button className="btn btn-sm btn-secondary" onClick={timer.clear}>Skip</button>
-        </div>
-      )}
-
       {exerciseStates.map((es, exIdx) => {
         const exercise = exercises.get(es.exerciseId);
         if (!exercise) return null;
+
+        // Check if all sets in this exercise are confirmed
+        const allConfirmed = es.sets.length > 0 && es.sets.every((_, setIdx) => confirmedSets.has(`${exIdx}-${setIdx}`));
+
+        // Find the first uncompleted exercise index for timer positioning
+        const firstUncompletedIdx = exerciseStates.findIndex((e, i) =>
+          !e.sets.every((_, si) => confirmedSets.has(`${i}-${si}`))
+        );
+        const showTimerHere = timer.active && exIdx === firstUncompletedIdx;
 
         const filledSets = es.sets
           .filter(s => s.weight && s.reps && s.isWorkingSet)
@@ -403,11 +574,80 @@ export function TodayScreen() {
         const avgE10rm = sessionE10RM(filledSets);
 
         return (
-          <div className="exercise-card" key={`${es.exerciseId}-${exIdx}`}>
-            <div className="exercise-card-header" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <div key={`${es.exerciseId}-${exIdx}`}>
+          {showTimerHere && (
+            <div className="timer-bar">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Rest Timer</div>
+                <div className="timer-display">
+                  {Math.floor(timer.remaining / 60)}:{String(timer.remaining % 60).padStart(2, '0')}
+                </div>
+                <div className="timer-progress">
+                  <div
+                    className="timer-progress-fill"
+                    style={{ width: `${((timer.total - timer.remaining) / timer.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <button className="btn btn-sm btn-secondary" onClick={timer.clear}>Skip</button>
+            </div>
+          )}
+          {collapsedExercises.has(exIdx) ? (
+            <div
+              className="exercise-card"
+              style={{ padding: '12px 16px', cursor: 'pointer' }}
+              onClick={() => setCollapsedExercises(prev => { const n = new Set(prev); n.delete(exIdx); return n; })}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {allConfirmed ? (
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 6, background: 'var(--green)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <Check size={14} color="white" />
+                  </div>
+                ) : (
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 6, background: 'var(--bg-input)',
+                    border: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <ChevronRight size={14} color="var(--text-muted)" />
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{exercise.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {es.sets.filter((_, si) => confirmedSets.has(`${exIdx}-${si}`)).length}/{es.sets.length} sets
+                    {avgE10rm > 0 && <> &middot; e10RM: {avgE10rm.toFixed(1)} kg</>}
+                  </div>
+                </div>
+                <ChevronDown size={16} color="var(--text-muted)" />
+              </div>
+            </div>
+          ) : (
+          <div className="exercise-card">
+            <div
+              className="exercise-card-header"
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}
+              onClick={(e) => {
+                // Only collapse if clicking the header background, not a child button/input/link
+                if ((e.target as HTMLElement).closest('button, a, h3')) return;
+                setCollapsedExercises(prev => new Set(prev).add(exIdx));
+              }}
+            >
+              {exercise.imageUrl && (
+                <img src={exercise.imageUrl} alt="" style={{
+                  width: 40, height: 40, borderRadius: 8, objectFit: 'cover',
+                  border: '1px solid var(--border)', flexShrink: 0,
+                }} />
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <h3 style={{ margin: 0 }}>{exercise.name}</h3>
+                  <h3
+                    style={{ margin: 0, cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--border)', textUnderlineOffset: 3 }}
+                    onClick={() => setViewingExerciseId(es.exerciseId)}
+                  >{exercise.name}</h3>
                   <span className={`badge badge-${es.suggestionReason === 'increase' ? 'green' : es.suggestionReason === 'deload' ? 'red' : 'accent'}`}>
                     {es.suggestionReason === 'increase' ? 'Progress' : es.suggestionReason === 'deload' ? 'Deload' : es.suggestionReason === 'first' ? 'New' : 'Hold'}
                   </span>
@@ -457,45 +697,101 @@ export function TodayScreen() {
               </div>
             </div>
 
-            <div className="set-labels">
+            <div className="set-labels" style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px' }}>
               <span>Set</span>
               <span>kg</span>
               <span>Reps</span>
+              <span>e10RM</span>
+              <span></span>
               <span>W</span>
             </div>
 
-            {es.sets.map((set, setIdx) => (
-              <div className="set-row" key={setIdx}>
-                <span className="set-num">{setIdx + 1}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="kg"
-                  value={set.weight}
-                  onChange={e => updateSet(exIdx, setIdx, 'weight', e.target.value)}
-                  onBlur={() => {
-                    if (set.weight && set.reps) logSet(es.restSeconds);
-                  }}
-                />
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="reps"
-                  value={set.reps}
-                  onChange={e => updateSet(exIdx, setIdx, 'reps', e.target.value)}
-                  onBlur={() => {
-                    if (set.weight && set.reps) logSet(es.restSeconds);
-                  }}
-                />
-                <button
-                  className={`working-toggle ${set.isWorkingSet ? 'active' : ''}`}
-                  onClick={() => toggleWorking(exIdx, setIdx)}
-                  aria-label={set.isWorkingSet ? 'Working set' : 'Warm-up set'}
-                >
-                  {set.isWorkingSet ? 'W' : 'WU'}
-                </button>
-              </div>
-            ))}
+            {es.sets.map((set, setIdx) => {
+              const w = parseFloat(set.weight) || 0;
+              const r = parseInt(set.reps) || 0;
+              const setE10rm = w > 0 && r > 0 ? calcE10RM(w, r) : 0;
+              const isFilled = set.weight !== '' && set.reps !== '';
+              const setKey = `${exIdx}-${setIdx}`;
+              const isConfirmed = confirmedSets.has(setKey);
+
+              // 3 states: empty (grey), filled but unconfirmed (green), confirmed (accent/blue)
+              let tickBg = 'var(--bg-input)';
+              let tickBorder = 'var(--border)';
+              let tickColor = 'var(--text-muted)';
+              if (isConfirmed) {
+                tickBg = 'var(--accent)';
+                tickBorder = 'var(--accent)';
+                tickColor = 'white';
+              } else if (isFilled) {
+                tickBg = 'var(--green)';
+                tickBorder = 'var(--green)';
+                tickColor = 'white';
+              }
+
+              return (
+                <div className="set-row" key={setIdx} style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px' }}>
+                  <span className="set-num">{setIdx + 1}</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="kg"
+                    value={set.weight}
+                    onChange={e => updateSet(exIdx, setIdx, 'weight', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="reps"
+                    value={set.reps}
+                    onChange={e => updateSet(exIdx, setIdx, 'reps', e.target.value)}
+                  />
+                  <span style={{ textAlign: 'center', fontSize: 12, color: setE10rm > 0 ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                    {setE10rm > 0 ? setE10rm.toFixed(0) : '—'}
+                  </span>
+                  <button
+                    className="working-toggle"
+                    style={{
+                      background: tickBg,
+                      borderColor: tickBorder,
+                      color: tickColor,
+                      width: 32, height: 32, fontSize: 14,
+                    }}
+                    onClick={() => {
+                      if (isFilled && !isConfirmed) {
+                        setConfirmedSets(prev => {
+                          const next = new Set(prev).add(setKey);
+                          // Auto-collapse if all sets in this exercise are now confirmed
+                          const allDone = es.sets.every((_, si) => next.has(`${exIdx}-${si}`));
+                          if (allDone) {
+                            setCollapsedExercises(cp => new Set(cp).add(exIdx));
+                          }
+                          // Persist confirmed sets immediately
+                          db.activeSession.toArray().then(saved => {
+                            if (saved.length > 0) {
+                              db.activeSession.update(saved[0].id!, { confirmedSets: [...next] });
+                            }
+                          });
+                          return next;
+                        });
+                        logSet(es.restSeconds);
+                      }
+                    }}
+                    disabled={!isFilled || isConfirmed}
+                    aria-label={isConfirmed ? 'Set confirmed' : 'Confirm set'}
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button
+                    className={`working-toggle ${set.isWorkingSet ? 'active' : ''}`}
+                    onClick={() => toggleWorking(exIdx, setIdx)}
+                    aria-label={set.isWorkingSet ? 'Working set' : 'Warm-up set'}
+                    style={{ width: 32, height: 32 }}
+                  >
+                    {set.isWorkingSet ? 'W' : 'WU'}
+                  </button>
+                </div>
+              );
+            })}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <button
@@ -521,6 +817,8 @@ export function TodayScreen() {
               </div>
             )}
           </div>
+          )}
+          </div>
         );
       })}
 
@@ -533,34 +831,17 @@ export function TodayScreen() {
       </button>
 
       {showAddExercise && (
-        <div className="modal-overlay" onClick={() => setShowAddExercise(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Add Exercise</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-              This won't modify the saved workout template.
-            </p>
-            <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-              {allExercises
-                .filter(ex => !exerciseStates.some(es => es.exerciseId === ex.id))
-                .map(ex => (
-                  <button
-                    key={ex.id}
-                    className="list-item"
-                    onClick={() => addExerciseToSession(ex.id!)}
-                  >
-                    <div>
-                      <div className="title">{ex.name}</div>
-                      <div className="subtitle">{ex.muscleGroup}</div>
-                    </div>
-                    <Plus size={16} color="var(--accent)" />
-                  </button>
-                ))}
-            </div>
-            <button className="btn btn-secondary btn-full mt-md" onClick={() => setShowAddExercise(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
+        <AddExerciseModal
+          exercises={allExercises.filter(ex => !exerciseStates.some(es => es.exerciseId === ex.id))}
+          sessionMuscleGroups={new Set(
+            exerciseStates.flatMap(es => {
+              const ex = exercises.get(es.exerciseId);
+              return ex ? [ex.muscleGroup, ...(ex.secondaryMuscleGroup ? [ex.secondaryMuscleGroup] : [])] : [];
+            })
+          )}
+          onAdd={(id) => addExerciseToSession(id)}
+          onClose={() => setShowAddExercise(false)}
+        />
       )}
     </div>
   );
