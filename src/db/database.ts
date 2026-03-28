@@ -112,16 +112,8 @@ function createDB(name: string): LiftDB {
 const DEMO_FLAG = 'lift-demo-mode';
 const isDemo = localStorage.getItem(DEMO_FLAG) === '1';
 
-const _state = { db: createDB(isDemo ? 'LiftDB-Demo' : 'LiftDB') };
+// Single DB instance — selected at load time based on localStorage flag.
+// Toggling demo mode reloads the page, so this re-evaluates with the new flag.
+const db: LiftDB = createDB(isDemo ? 'LiftDB-Demo' : 'LiftDB');
 
-export function switchDB(demo: boolean) {
-  _state.db.close();
-  _state.db = createDB(demo ? 'LiftDB-Demo' : 'LiftDB');
-}
-
-// Use a proxy so all imports always reference the current DB instance
-export const db: LiftDB = new Proxy({} as LiftDB, {
-  get(_target, prop) {
-    return (_state.db as any)[prop];
-  },
-});
+export { db };

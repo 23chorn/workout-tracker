@@ -1,5 +1,4 @@
-import { db, switchDB } from './database';
-import { seedDatabase } from './seed';
+import { db } from './database';
 import { sessionE10RM } from '../utils/e10rm';
 
 const DEMO_FLAG_KEY = 'lift-demo-mode';
@@ -10,21 +9,18 @@ export function isDemoMode(): boolean {
 
 export async function enableDemo(): Promise<void> {
   localStorage.setItem(DEMO_FLAG_KEY, '1');
-  switchDB(true);
-  // Only generate demo data if the demo DB is empty
-  const count = await db.sessions.count();
-  if (count === 0) {
-    await seedDatabase();
-    await generateDemoData();
-  }
-  // Reload to re-bind all live queries to the new DB
   window.location.reload();
 }
 
 export async function disableDemo(): Promise<void> {
   localStorage.removeItem(DEMO_FLAG_KEY);
-  // Reload to switch DB and re-bind all live queries
   window.location.reload();
+}
+
+export async function ensureDemoData(): Promise<void> {
+  const count = await db.sessions.count();
+  if (count > 0) return;
+  await generateDemoData();
 }
 
 // Helpers
