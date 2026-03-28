@@ -359,6 +359,7 @@ export function HistoryScreen() {
             <button
               key={session.id}
               className="list-item"
+              style={{ width: '100%' }}
               onClick={() => setSelectedDaySessions([session])}
             >
               <div style={{ textAlign: 'left' }}>
