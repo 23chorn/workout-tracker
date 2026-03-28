@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Session } from '../db/database';
-import { ChevronLeft, ChevronRight, Calendar, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, List, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 function E10RMChart({ exerciseId, exerciseName, sessions }: {
   exerciseId: number;
@@ -196,6 +197,14 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
   onBack: () => void;
 }) {
   const [selected, setSelected] = useState<Session>(daySessions[0]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteSession = async () => {
+    if (!selected.id) return;
+    await db.sessions.delete(selected.id);
+    setShowDeleteConfirm(false);
+    onBack();
+  };
 
   return (
     <div className="screen">
@@ -270,6 +279,25 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
           sessions={allSessions}
         />
       ))}
+
+      <button
+        className="btn btn-danger btn-full"
+        style={{ marginTop: 24 }}
+        onClick={() => setShowDeleteConfirm(true)}
+      >
+        <Trash2 size={14} /> Delete Session
+      </button>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Session"
+          message={`Delete this ${selected.dayLabel} session from ${new Date(selected.date).toLocaleDateString()}? This cannot be undone.`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={deleteSession}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }
