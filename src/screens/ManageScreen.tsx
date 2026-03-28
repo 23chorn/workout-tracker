@@ -4,7 +4,7 @@ import { db, type Workout, type WorkoutExercise, type Program, type ProgramDay }
 import { exportData, importData } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
 import { ExerciseDetail } from '../components/ExerciseDetail';
-import { Plus, Trash2, Download, Upload, X, FlaskConical, Camera, Dumbbell, Check } from 'lucide-react';
+import { Plus, Trash2, Download, Upload, X, FlaskConical, Camera, Dumbbell, Check, ChevronUp, ChevronDown } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 
@@ -350,6 +350,16 @@ function WorkoutManager() {
     setWExercises(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const moveWExercise = (idx: number, direction: -1 | 1) => {
+    const target = idx + direction;
+    setWExercises(prev => {
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  };
+
   const save = async () => {
     if (!name.trim()) return;
     const data = { name: name.trim(), exercises: wExercises };
@@ -402,9 +412,29 @@ function WorkoutManager() {
             <div className="card" key={idx}>
               <div className="row-between mb-sm">
                 <strong style={{ fontSize: 14 }}>{ex?.name ?? 'Unknown'}</strong>
-                <button onClick={() => removeExercise(idx)} style={{ color: 'var(--red)' }}>
-                  <Trash2 size={16} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <button
+                      className="btn btn-sm"
+                      style={{ padding: '2px 4px', minHeight: 0, opacity: idx === 0 ? 0.3 : 1 }}
+                      onClick={() => moveWExercise(idx, -1)}
+                      disabled={idx === 0}
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ padding: '2px 4px', minHeight: 0, opacity: idx === wExercises.length - 1 ? 0.3 : 1 }}
+                      onClick={() => moveWExercise(idx, 1)}
+                      disabled={idx === wExercises.length - 1}
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                  <button onClick={() => removeExercise(idx)} style={{ color: 'var(--red)', padding: 4 }}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>

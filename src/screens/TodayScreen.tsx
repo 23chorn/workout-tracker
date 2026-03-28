@@ -38,6 +38,14 @@ export function TodayScreen() {
   const [confirmedSets, setConfirmedSets] = useState<Set<string>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [summary, setSummary] = useState<{
+    dayLabel: string;
+    duration: number;
+    exerciseCount: number;
+    totalSets: number;
+    totalVolume: number;
+    pbs: { name: string; e10RM: number }[];
+  } | null>(null);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
 
@@ -357,6 +365,34 @@ export function TodayScreen() {
       };
     });
 
+    // Compute PBs before saving (compare against existing sessions)
+    const existingSessions = await db.sessions.toArray();
+    const allTimeBest = new Map<number, number>();
+    for (const s of existingSessions) {
+      for (const ex of s.exercises) {
+        const cur = allTimeBest.get(ex.exerciseId) ?? 0;
+        if (ex.e10RM > cur) allTimeBest.set(ex.exerciseId, ex.e10RM);
+      }
+    }
+    const pbs: { name: string; e10RM: number }[] = [];
+    for (const se of sessionExercises) {
+      if (se.e10RM > 0 && se.e10RM > (allTimeBest.get(se.exerciseId) ?? 0)) {
+        const ex = exercises.get(se.exerciseId);
+        if (ex) pbs.push({ name: ex.name, e10RM: se.e10RM });
+      }
+    }
+
+    // Compute stats
+    let totalSets = 0;
+    let totalVolume = 0;
+    for (const se of sessionExercises) {
+      for (const set of se.sets) {
+        totalSets++;
+        totalVolume += set.weight * set.reps;
+      }
+    }
+    const duration = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
+
     await db.sessions.add({
       date: startedAt || new Date().toISOString(),
       programId: selectedProgramId,
@@ -366,9 +402,18 @@ export function TodayScreen() {
     });
 
     await db.activeSession.clear();
+
+    setSummary({
+      dayLabel: selectedDayLabel,
+      duration,
+      exerciseCount: sessionExercises.filter(e => e.sets.length > 0).length,
+      totalSets,
+      totalVolume,
+      pbs,
+    });
+
     setSessionActive(false);
     setExerciseStates([]);
-    setSelectedDayLabel(null);
     setConfirmedSets(new Set());
     setCollapsedExercises(new Set());
     timer.clear();
@@ -385,6 +430,61 @@ export function TodayScreen() {
     }, 1000);
     return () => clearInterval(id);
   }, [sessionActive, startedAt]);
+
+  if (summary) {
+    const formatVolume = (kg: number) => {
+      if (kg >= 1000) return `${(kg / 1000).toFixed(1)}K kg`;
+      return `${Math.round(kg)} kg`;
+    };
+    return (
+      <div className="screen">
+        <div style={{ textAlign: 'center', paddingTop: 20 }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>&#10003;</div>
+          <h1 style={{ marginBottom: 4 }}>Session Complete</h1>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>{summary.dayLabel}</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Duration</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.duration}m</div>
+          </div>
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Exercises</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.exerciseCount}</div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Total Sets</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.totalSets}</div>
+          </div>
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Volume</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{formatVolume(summary.totalVolume)}</div>
+          </div>
+        </div>
+
+        {summary.pbs.length > 0 && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="pb-badge">PB</span> New Personal Bests
+            </div>
+            {summary.pbs.map((pb, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                <span style={{ fontSize: 14 }}>{pb.name}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--yellow)' }}>{pb.e10RM.toFixed(1)} kg</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="btn btn-primary btn-full" onClick={() => { setSummary(null); setSelectedDayLabel(null); }}>
+          Done
+        </button>
+      </div>
+    );
+  }
 
   if (!sessionActive) {
     return (
