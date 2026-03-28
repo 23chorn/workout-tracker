@@ -126,6 +126,7 @@ async function generateDemoData() {
 
   const sessions: {
     date: string;
+    durationMinutes: number;
     programId: number;
     dayLabel: string;
     workoutId: number;
@@ -213,6 +214,7 @@ async function generateDemoData() {
 
       sessions.push({
         date: sessionDate.toISOString(),
+        durationMinutes: Math.floor(jitter(55, 0.25)),
         programId,
         dayLabel: dayDef.label,
         workoutId: dayDef.workoutId,
