@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db/database';
-import { ChevronLeft } from 'lucide-react';
+import { db, type SessionSet } from '../db/database';
+import { calcE10RM } from '../utils/e10rm';
+import { ChevronLeft, ChevronDown } from 'lucide-react';
 
 type TimePeriod = '3m' | '6m' | '1y' | 'all';
 const PERIOD_LABELS: Record<TimePeriod, string> = { '3m': '3M', '6m': '6M', '1y': '1Y', 'all': 'All' };
@@ -42,11 +43,13 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, children }: {
       .filter(s => !cutoff || new Date(s.date) >= cutoff)
       .map(s => {
         const ex = s.exercises.find(e => e.exerciseId === exerciseId)!;
-        return { date: new Date(s.date), e10RM: ex.e10RM };
+        return { date: new Date(s.date), e10RM: ex.e10RM, sets: ex.sets };
       })
       .filter(d => d.e10RM > 0)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [sessions, exerciseId, period]);
+
+  const [expandedSession, setExpandedSession] = useState<number | null>(null);
 
   if (!exercise) return null;
 
@@ -161,23 +164,62 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, children }: {
           )}
 
           <h2 style={{ marginTop: 20, marginBottom: 4 }}>Recent Sessions</h2>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Average e10RM (kg) per session</div>
-          {dataPoints.slice().reverse().slice(0, 10).map((dp, i) => (
-            <div key={i} className="list-item" style={{ cursor: 'default', width: '100%' }}>
-              <div>
-                <div className="subtitle">
-                  {dp.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Tap for set details</div>
+          {dataPoints.slice().reverse().slice(0, 10).map((dp, i) => {
+            const isExpanded = expandedSession === i;
+            return (
+              <div key={i} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
+                <button
+                  style={{
+                    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '12px 14px', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer',
+                  }}
+                  onClick={() => setExpandedSession(isExpanded ? null : i)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ChevronDown size={14} color="var(--text-muted)" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                    <div className="subtitle" style={{ margin: 0 }}>
+                      {dp.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                    color: dp.e10RM >= bestE10RM ? 'var(--yellow)' : 'var(--accent)',
+                  }}>
+                    {dp.e10RM.toFixed(1)} kg
+                    {dp.e10RM >= bestE10RM && <span className="pb-badge" style={{ marginLeft: 6, fontSize: 10 }}>PB</span>}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
+                    <div className="set-labels" style={{ gridTemplateColumns: '32px 1fr 1fr 50px 40px', marginTop: 10 }}>
+                      <span>Set</span>
+                      <span>kg</span>
+                      <span>Reps</span>
+                      <span>e10RM</span>
+                      <span>Type</span>
+                    </div>
+                    {dp.sets.map((set: SessionSet, si: number) => {
+                      const setE10rm = set.weight > 0 && set.reps > 0 ? calcE10RM(set.weight, set.reps) : 0;
+                      return (
+                        <div key={si} className="set-row" style={{ gridTemplateColumns: '32px 1fr 1fr 50px 40px', marginBottom: 4 }}>
+                          <span className="set-num">{si + 1}</span>
+                          <span style={{ textAlign: 'center' }}>{set.weight}</span>
+                          <span style={{ textAlign: 'center' }}>{set.reps}</span>
+                          <span style={{ textAlign: 'center', fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
+                            {setE10rm > 0 ? setE10rm.toFixed(0) : '—'}
+                          </span>
+                          <span style={{ textAlign: 'center', fontSize: 11, color: set.isWorkingSet ? 'var(--accent)' : 'var(--text-muted)' }}>
+                            {set.isWorkingSet ? 'W' : 'WU'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <span style={{
-                fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                color: dp.e10RM >= bestE10RM ? 'var(--yellow)' : 'var(--accent)',
-              }}>
-                {dp.e10RM.toFixed(1)} kg
-                {dp.e10RM >= bestE10RM && <span className="pb-badge" style={{ marginLeft: 6, fontSize: 10 }}>PB</span>}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
 
