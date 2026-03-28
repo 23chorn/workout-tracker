@@ -17,12 +17,14 @@ export async function enableDemo(): Promise<void> {
     await seedDatabase();
     await generateDemoData();
   }
+  // Reload to re-bind all live queries to the new DB
+  window.location.reload();
 }
 
 export async function disableDemo(): Promise<void> {
   localStorage.removeItem(DEMO_FLAG_KEY);
-  switchDB(false);
-  await seedDatabase();
+  // Reload to switch DB and re-bind all live queries
+  window.location.reload();
 }
 
 // Helpers
