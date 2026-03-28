@@ -102,6 +102,13 @@ function ExerciseManager() {
   })();
   const groups = [...new Set(filtered.map(e => e.muscleGroup))].sort();
   const [editingFields, setEditingFields] = useState(false);
+  const [showDeleteExercise, setShowDeleteExercise] = useState(false);
+
+  const deleteExercise = async (id: number) => {
+    await db.exercises.delete(id);
+    setShowDeleteExercise(false);
+    closeExercise();
+  };
   const [editName, setEditName] = useState('');
   const [editMuscle, setEditMuscle] = useState('');
   const [editSecondary, setEditSecondary] = useState('');
@@ -201,6 +208,23 @@ function ExerciseManager() {
             style={{ display: 'none' }}
           />
         </ExerciseDetail>
+        <button
+          className="btn btn-danger btn-full"
+          style={{ marginTop: 24 }}
+          onClick={() => setShowDeleteExercise(true)}
+        >
+          <Trash2 size={14} /> Delete Exercise
+        </button>
+        {showDeleteExercise && (
+          <ConfirmDialog
+            title="Delete Exercise"
+            message={`Delete "${viewing.name}"? This won't remove it from existing sessions but it will be removed from the library and any workout templates.`}
+            confirmLabel="Delete"
+            destructive
+            onConfirm={() => deleteExercise(viewing.id!)}
+            onCancel={() => setShowDeleteExercise(false)}
+          />
+        )}
       </div>
     );
   }
@@ -564,8 +588,11 @@ function ProgramManager() {
     setEditing(null);
   };
 
+  const [confirmDeleteProgramId, setConfirmDeleteProgramId] = useState<number | null>(null);
+
   const deleteProgram = async (id: number) => {
     await db.programs.delete(id);
+    setConfirmDeleteProgramId(null);
   };
 
   if (editing) {
@@ -645,12 +672,23 @@ function ProgramManager() {
                   )}
                 </div>
               </div>
-              <button onClick={e => { e.stopPropagation(); deleteProgram(p.id!); }} style={{ color: 'var(--red)', padding: 8 }}>
+              <button onClick={e => { e.stopPropagation(); setConfirmDeleteProgramId(p.id!); }} style={{ color: 'var(--red)', padding: 8 }}>
                 <Trash2 size={16} />
               </button>
             </div>
           );
         })
+      )}
+
+      {confirmDeleteProgramId !== null && (
+        <ConfirmDialog
+          title="Delete Program"
+          message="This program will be permanently deleted."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => deleteProgram(confirmDeleteProgramId)}
+          onCancel={() => setConfirmDeleteProgramId(null)}
+        />
       )}
     </div>
   );
@@ -690,7 +728,11 @@ function DeleteAllButton() {
   );
 }
 
-function HelpSection() {
+function HelpSection({ demo, demoLoading, onToggleDemo }: {
+  demo: boolean;
+  demoLoading: boolean;
+  onToggleDemo: () => void;
+}) {
   return (
     <div>
       <h2>Progression Badges</h2>
@@ -804,7 +846,23 @@ function HelpSection() {
         </p>
       </div>
 
-      <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 16 }}>Demo Mode</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+          Load sample data to explore the app. Your real data is kept separate and unaffected.
+        </p>
+        <button
+          className={`btn btn-full mb-md ${demo ? 'btn-danger' : 'btn-secondary'}`}
+          onClick={onToggleDemo}
+          disabled={demoLoading}
+          style={{ fontSize: 13 }}
+        >
+          <FlaskConical size={14} />
+          {demoLoading ? 'Loading...' : demo ? 'Demo Mode ON — tap to disable' : 'Enable Demo Mode'}
+        </button>
+      </div>
+
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
         <h2 style={{ color: 'var(--red)', fontSize: 16 }}>Danger Zone</h2>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
           This cannot be undone. Export your data first if you want a backup.
@@ -878,16 +936,6 @@ export function ManageScreen() {
         </div>
       </div>
 
-      <button
-        className={`btn btn-sm btn-full mb-md ${demo ? 'btn-danger' : 'btn-secondary'}`}
-        onClick={toggleDemo}
-        disabled={demoLoading}
-        style={{ fontSize: 13 }}
-      >
-        <FlaskConical size={14} />
-        {demoLoading ? 'Loading...' : demo ? 'Demo Mode ON — tap to clear' : 'Load Demo Data'}
-      </button>
-
       <div className="sub-tabs">
         {(['exercises', 'workouts', 'programs'] as Tab[]).map(t => (
           <button key={t} className={`sub-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
@@ -909,7 +957,7 @@ export function ManageScreen() {
                 <X size={14} />
               </button>
             </div>
-            <HelpSection />
+            <HelpSection demo={demo} demoLoading={demoLoading} onToggleDemo={toggleDemo} />
           </div>
         </div>
       )}

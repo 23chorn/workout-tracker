@@ -395,6 +395,7 @@ export function TodayScreen() {
 
     await db.sessions.add({
       date: startedAt || new Date().toISOString(),
+      durationMinutes: duration,
       programId: selectedProgramId,
       dayLabel: selectedDayLabel,
       workoutId,

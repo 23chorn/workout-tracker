@@ -76,6 +76,64 @@ function WeeklyChart({ sessions }: { sessions: Session[] }) {
   );
 }
 
+function MuscleVolumeChart({ sessions }: { sessions: Session[] }) {
+  const allExercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
+  const exMap = new Map(allExercises.map(e => [e.id!, e]));
+
+  const volumeByMuscle = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of sessions) {
+      for (const se of s.exercises) {
+        const ex = exMap.get(se.exerciseId);
+        if (!ex) continue;
+        for (const set of se.sets) {
+          if (!set.isWorkingSet) continue;
+          const vol = set.weight * set.reps;
+          map.set(ex.muscleGroup, (map.get(ex.muscleGroup) ?? 0) + vol);
+          if (ex.secondaryMuscleGroup) {
+            map.set(ex.secondaryMuscleGroup, (map.get(ex.secondaryMuscleGroup) ?? 0) + vol * 0.5);
+          }
+        }
+      }
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [sessions, exMap]);
+
+  if (volumeByMuscle.length === 0) return null;
+
+  const maxVol = volumeByMuscle[0][1];
+
+  const formatVol = (v: number) => {
+    if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
+    return String(Math.round(v));
+  };
+
+  return (
+    <div className="chart">
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Volume by Muscle Group (kg)</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {volumeByMuscle.map(([muscle, vol]) => (
+          <div key={muscle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+              <span>{muscle}</span>
+              <span style={{ color: 'var(--text-muted)' }}>{formatVol(vol)} kg</span>
+            </div>
+            <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${(vol / maxVol) * 100}%`,
+                background: 'var(--accent)',
+                borderRadius: 4,
+              }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PersonalBests({ sessions, onSelectExercise }: {
   sessions: Session[];
   onSelectExercise: (id: number, name: string, best: number) => void;
@@ -243,6 +301,10 @@ export function StatsScreen() {
           </div>
 
           <WeeklyChart sessions={sessions} />
+
+          <div style={{ marginTop: 16 }}>
+            <MuscleVolumeChart sessions={sessions} />
+          </div>
 
           <div style={{ marginTop: 16 }}>
             <PersonalBests

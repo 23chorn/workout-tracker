@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Session } from '../db/database';
-import { ChevronLeft, ChevronRight, Calendar, List, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, List, Trash2, Pencil } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { sessionE10RM } from '../utils/e10rm';
 
 function E10RMChart({ exerciseId, exerciseName, sessions }: {
   exerciseId: number;
@@ -198,6 +199,46 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
 }) {
   const [selected, setSelected] = useState<Session>(daySessions[0]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editSets, setEditSets] = useState<{ weight: string; reps: string; isWorkingSet: boolean }[][]>([]);
+
+  const startEditing = () => {
+    setEditSets(selected.exercises.map(se =>
+      se.sets.map(s => ({ weight: String(s.weight), reps: String(s.reps), isWorkingSet: s.isWorkingSet }))
+    ));
+    setEditing(true);
+  };
+
+  const saveEdits = async () => {
+    if (!selected.id) return;
+    const updatedExercises = selected.exercises.map((se, exIdx) => {
+      const sets = editSets[exIdx].filter(s => s.weight && s.reps).map(s => ({
+        weight: parseFloat(s.weight),
+        reps: parseInt(s.reps),
+        isWorkingSet: s.isWorkingSet,
+      }));
+      return { ...se, sets, e10RM: sessionE10RM(sets) };
+    });
+    await db.sessions.update(selected.id, { exercises: updatedExercises });
+    setSelected({ ...selected, exercises: updatedExercises });
+    setEditing(false);
+  };
+
+  const updateEditSet = (exIdx: number, setIdx: number, field: 'weight' | 'reps', value: string) => {
+    setEditSets(prev => {
+      const next = prev.map(e => [...e]);
+      next[exIdx][setIdx] = { ...next[exIdx][setIdx], [field]: value };
+      return next;
+    });
+  };
+
+  const toggleEditWorking = (exIdx: number, setIdx: number) => {
+    setEditSets(prev => {
+      const next = prev.map(e => [...e]);
+      next[exIdx][setIdx] = { ...next[exIdx][setIdx], isWorkingSet: !next[exIdx][setIdx].isWorkingSet };
+      return next;
+    });
+  };
 
   const deleteSession = async () => {
     if (!selected.id) return;
@@ -217,6 +258,7 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
         {new Date(selected.date).toLocaleDateString(undefined, {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         })}
+        {selected.durationMinutes != null && <> &middot; {selected.durationMinutes}m</>}
       </p>
 
       {daySessions.length > 1 && (
@@ -233,12 +275,24 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
         </div>
       )}
 
-      {selected.exercises.map((se, idx) => {
+      {!editing && (
+        <button className="btn btn-sm btn-secondary mb-md" onClick={startEditing}>
+          <Pencil size={14} /> Edit Session
+        </button>
+      )}
+      {editing && (
+        <div className="row" style={{ marginBottom: 12 }}>
+          <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancel</button>
+          <button className="btn btn-sm btn-primary" style={{ flex: 1 }} onClick={saveEdits}>Save Changes</button>
+        </div>
+      )}
+
+      {selected.exercises.map((se, exIdx) => {
         const exercise = exMap.get(se.exerciseId);
         const isPB = se.e10RM > 0 && se.e10RM >= (allTimeBest.get(se.exerciseId) ?? 0);
 
         return (
-          <div className="exercise-card" key={idx}>
+          <div className="exercise-card" key={exIdx}>
             <div className="exercise-card-header">
               <div>
                 <h3>
@@ -250,22 +304,51 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
                 <span className="badge badge-accent">e10RM: {se.e10RM.toFixed(1)}</span>
               )}
             </div>
-            <div className="set-labels">
+            <div className="set-labels" style={editing ? { gridTemplateColumns: '40px 1fr 1fr 48px' } : undefined}>
               <span>Set</span>
               <span>kg</span>
               <span>Reps</span>
-              <span>Type</span>
+              <span>{editing ? 'W' : 'Type'}</span>
             </div>
-            {se.sets.map((set, si) => (
-              <div className="set-row" key={si} style={{ marginBottom: 4 }}>
-                <span className="set-num">{si + 1}</span>
-                <span style={{ textAlign: 'center' }}>{set.weight}</span>
-                <span style={{ textAlign: 'center' }}>{set.reps}</span>
-                <span style={{ textAlign: 'center', fontSize: 12, color: set.isWorkingSet ? 'var(--accent)' : 'var(--text-muted)' }}>
-                  {set.isWorkingSet ? 'W' : 'WU'}
-                </span>
-              </div>
-            ))}
+            {editing ? (
+              editSets[exIdx]?.map((set, si) => (
+                <div className="set-row" key={si} style={{ marginBottom: 4 }}>
+                  <span className="set-num">{si + 1}</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={set.weight}
+                    onChange={e => updateEditSet(exIdx, si, 'weight', e.target.value)}
+                    style={{ padding: 6, textAlign: 'center', fontSize: 14 }}
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={set.reps}
+                    onChange={e => updateEditSet(exIdx, si, 'reps', e.target.value)}
+                    style={{ padding: 6, textAlign: 'center', fontSize: 14 }}
+                  />
+                  <button
+                    className={`working-toggle ${set.isWorkingSet ? 'active' : ''}`}
+                    onClick={() => toggleEditWorking(exIdx, si)}
+                    style={{ width: 32, height: 32 }}
+                  >
+                    {set.isWorkingSet ? 'W' : 'WU'}
+                  </button>
+                </div>
+              ))
+            ) : (
+              se.sets.map((set, si) => (
+                <div className="set-row" key={si} style={{ marginBottom: 4 }}>
+                  <span className="set-num">{si + 1}</span>
+                  <span style={{ textAlign: 'center' }}>{set.weight}</span>
+                  <span style={{ textAlign: 'center' }}>{set.reps}</span>
+                  <span style={{ textAlign: 'center', fontSize: 12, color: set.isWorkingSet ? 'var(--accent)' : 'var(--text-muted)' }}>
+                    {set.isWorkingSet ? 'W' : 'WU'}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         );
       })}

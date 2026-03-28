@@ -48,6 +48,7 @@ export interface SessionExercise {
 export interface Session {
   id?: number;
   date: string;
+  durationMinutes?: number;
   programId: number;
   dayLabel: string;
   workoutId: number;
