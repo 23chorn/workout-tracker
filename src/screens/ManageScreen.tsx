@@ -626,6 +626,40 @@ function ProgramManager() {
   );
 }
 
+function DeleteAllButton() {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const deleteAll = async () => {
+    await db.transaction('rw', [db.exercises, db.workouts, db.programs, db.sessions, db.activeSession], async () => {
+      await db.exercises.clear();
+      await db.workouts.clear();
+      await db.programs.clear();
+      await db.sessions.clear();
+      await db.activeSession.clear();
+    });
+    setShowConfirm(false);
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <button className="btn btn-danger btn-full" onClick={() => setShowConfirm(true)}>
+        <Trash2 size={14} /> Delete All Data
+      </button>
+      {showConfirm && (
+        <ConfirmDialog
+          title="Delete All Data"
+          message="This will permanently delete all exercises, workouts, programs, and session history. This cannot be undone."
+          confirmLabel="Delete Everything"
+          destructive
+          onConfirm={deleteAll}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+    </>
+  );
+}
+
 function HelpSection() {
   return (
     <div>
@@ -738,6 +772,14 @@ function HelpSection() {
         <p style={{ fontSize: 13, lineHeight: 1.6 }}>
           All data is stored locally on your device in the browser. Nothing is sent to a server. Use the export/import buttons at the top of this screen to back up your data as a JSON file.
         </p>
+      </div>
+
+      <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+        <h2 style={{ color: 'var(--red)', fontSize: 16 }}>Danger Zone</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+          This cannot be undone. Export your data first if you want a backup.
+        </p>
+        <DeleteAllButton />
       </div>
     </div>
   );
