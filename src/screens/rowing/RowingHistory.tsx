@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { type RowingSession } from '../../db/database';
-import { formatSplit } from '../../utils/date';
+import { formatSplit, formatMinSec } from '../../utils/date';
 import { ChevronDown, Trophy } from 'lucide-react';
 
 function getWeekKey(date: Date): string {
@@ -209,7 +209,7 @@ export function RowingHistory({ sessions }: { sessions: RowingSession[] }) {
             {expanded === i && (
               <div style={{ padding: '0 14px 12px', borderTop: '1px solid var(--border)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10, fontSize: 13 }}>
-                  {s.totalTime != null && <div><span style={{ color: 'var(--text-muted)' }}>Time:</span> {s.totalTime} min</div>}
+                  {s.totalTime != null && <div><span style={{ color: 'var(--text-muted)' }}>Time:</span> {formatMinSec(s.totalTime)}</div>}
                   {s.totalDistance != null && <div><span style={{ color: 'var(--text-muted)' }}>Distance:</span> {s.totalDistance}m</div>}
                   {s.avgSplit != null && <div><span style={{ color: 'var(--text-muted)' }}>Split:</span> {formatSplit(s.avgSplit)}/500m</div>}
                   {s.avgSPM != null && <div><span style={{ color: 'var(--text-muted)' }}>SPM:</span> {s.avgSPM}</div>}

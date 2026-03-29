@@ -7,3 +7,10 @@ export function formatSplit(seconds: number): string {
   const s = Math.round(seconds % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+
+export function formatMinSec(minutes: number): string {
+  const totalSec = Math.round(minutes * 60);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db, type RowingSession } from '../../db/database';
-import { formatSplit } from '../../utils/date';
+import { formatSplit, formatMinSec } from '../../utils/date';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ChevronLeft, Trash2, Waves } from 'lucide-react';
 import { StatCard } from '../StatCard';
@@ -30,13 +30,13 @@ export function RowingSessionDetail({ session: rs, onBack }: {
       <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
         {new Date(rs.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         {rs.week && ` · Pete Plan Week ${rs.week}`}
-        {rs.totalTime != null && ` · ${rs.totalTime}m`}
+        {rs.totalTime != null && ` · ${formatMinSec(rs.totalTime)}`}
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
         {rs.totalDistance != null && <StatCard label="Distance" value={`${rs.totalDistance.toLocaleString()}m`} />}
         {rs.avgSplit != null && <StatCard label="Avg Split" value={`${formatSplit(rs.avgSplit)}/500m`} color="var(--green)" />}
-        {rs.totalTime != null && <StatCard label="Time" value={`${rs.totalTime} min`} />}
+        {rs.totalTime != null && <StatCard label="Time" value={formatMinSec(rs.totalTime)} />}
         {rs.avgSPM != null && <StatCard label="SPM" value={rs.avgSPM} />}
         {rs.calories != null && <StatCard label="Calories" value={rs.calories} />}
         {rs.hr != null && <StatCard label="Heart Rate" value={rs.hr} sub="bpm" />}
@@ -52,7 +52,7 @@ export function RowingSessionDetail({ session: rs, onBack }: {
             <div key={idx} className="set-row" style={{ gridTemplateColumns: '32px 1fr 1fr 1fr 1fr', marginBottom: 2 }}>
               <span className="set-num">{iv.rep}</span>
               <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.distance ?? '—'}m</span>
-              <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.time ? `${iv.time}s` : '—'}</span>
+              <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.time ? formatSplit(iv.time) : '—'}</span>
               <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>{formatSplit(iv.split)}</span>
               <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.spm ?? '—'}</span>
             </div>
