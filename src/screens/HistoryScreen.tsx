@@ -1,9 +1,18 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Session } from '../db/database';
-import { ChevronLeft, ChevronRight, Calendar, List, Trash2, Pencil } from 'lucide-react';
+import { db, type Session, type RowingSession } from '../db/database';
+import { ChevronLeft, ChevronRight, Calendar, List, Trash2, Pencil, Dumbbell, Waves } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { sessionE10RM } from '../utils/e10rm';
+import { isRowingEnabled } from '../App';
+
+type FilterType = 'all' | 'lift' | 'rowing';
+
+function formatSplit(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 function E10RMChart({ exerciseId, exerciseName, sessions }: {
   exerciseId: number;
@@ -67,9 +76,10 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function CalendarView({ sessions, sessionsByDate, onSelectDate }: {
+function CalendarView({ sessions, sessionsByDate, rowingByDate, onSelectDate }: {
   sessions: Session[];
   sessionsByDate: Map<string, Session[]>;
+  rowingByDate: Map<string, RowingSession[]>;
   onSelectDate: (sessions: Session[]) => void;
 }) {
   const [viewDate, setViewDate] = useState(() => new Date());
@@ -139,13 +149,26 @@ function CalendarView({ sessions, sessionsByDate, onSelectDate }: {
 
           const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const daySessions = sessionsByDate.get(dateKey);
-          const hasSession = !!daySessions && daySessions.length > 0;
+          const dayRowing = rowingByDate.get(dateKey);
+          const hasLift = !!daySessions && daySessions.length > 0;
+          const hasRowing = !!dayRowing && dayRowing.length > 0;
+          const hasAny = hasLift || hasRowing;
+          const hasBoth = hasLift && hasRowing;
           const isToday = dateKey === today;
+
+          let bg = isToday ? 'var(--bg-input)' : 'transparent';
+          if (hasBoth) {
+            bg = 'linear-gradient(135deg, var(--accent) 50%, var(--green) 50%)';
+          } else if (hasLift) {
+            bg = 'var(--accent)';
+          } else if (hasRowing) {
+            bg = 'var(--green)';
+          }
 
           return (
             <button
               key={i}
-              onClick={() => daySessions && onSelectDate(daySessions)}
+              onClick={() => hasAny && daySessions && onSelectDate(daySessions)}
               style={{
                 aspectRatio: '1',
                 display: 'flex',
@@ -155,34 +178,40 @@ function CalendarView({ sessions, sessionsByDate, onSelectDate }: {
                 borderRadius: 8,
                 fontSize: 14,
                 fontWeight: isToday ? 700 : 400,
-                color: hasSession ? 'var(--text)' : 'var(--text-muted)',
-                background: hasSession ? 'var(--accent)' : isToday ? 'var(--bg-input)' : 'transparent',
-                border: isToday && !hasSession ? '1px solid var(--border)' : 'none',
-                cursor: hasSession ? 'pointer' : 'default',
+                color: hasAny ? 'var(--text)' : 'var(--text-muted)',
+                background: bg,
+                border: isToday && !hasAny ? '1px solid var(--border)' : 'none',
+                cursor: hasAny ? 'pointer' : 'default',
                 position: 'relative',
                 minHeight: 40,
               }}
             >
               {day}
-              {hasSession && daySessions.length > 1 && (
-                <span style={{ fontSize: 9, opacity: 0.8 }}>{daySessions.length}x</span>
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* Month summary */}
+      {/* Month summary + legend */}
       {(() => {
-        const monthSessions = sessions.filter(s => {
+        const monthLift = sessions.filter(s => {
           const d = new Date(s.date);
           return d.getMonth() === month && d.getFullYear() === year;
-        });
+        }).length;
+        const allRowingDates = [...rowingByDate.entries()];
+        const monthRowing = allRowingDates.filter(([key]) => {
+          const d = new Date(key);
+          return d.getMonth() === month && d.getFullYear() === year;
+        }).reduce((sum, [, arr]) => sum + arr.length, 0);
         return (
-          <div style={{
-            marginTop: 12, padding: '8px 0', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center',
-          }}>
-            {monthSessions.length} session{monthSessions.length !== 1 ? 's' : ''} in {viewDate.toLocaleDateString(undefined, { month: 'long' })}
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div style={{ marginBottom: 4 }}>
+              {monthLift + monthRowing} session{monthLift + monthRowing !== 1 ? 's' : ''} in {viewDate.toLocaleDateString(undefined, { month: 'long' })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: 'var(--accent)', marginRight: 4, verticalAlign: 'middle' }} />Lift</span>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: 'var(--green)', marginRight: 4, verticalAlign: 'middle' }} />Rowing</span>
+            </div>
           </div>
         );
       })()}
@@ -385,12 +414,139 @@ function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest,
   );
 }
 
+function RowingSessionDetail({ session: rs, onBack }: {
+  session: RowingSession;
+  onBack: () => void;
+}) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteRowingSession = async () => {
+    if (!rs.id) return;
+    await db.rowingSessions.delete(rs.id);
+    setShowDeleteConfirm(false);
+    onBack();
+  };
+
+  const tl = (t: string) => t === 'steady' ? 'Steady State' : t === 'distance' ? 'Distance' : 'Intervals';
+
+  return (
+    <div className="screen">
+      <button className="btn btn-sm btn-secondary mb-md" onClick={onBack}>
+        <ChevronLeft size={16} /> Back
+      </button>
+
+      <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Waves size={22} color="var(--green)" />
+        {tl(rs.type)}
+      </h1>
+      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+        {new Date(rs.date).toLocaleDateString(undefined, {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        })}
+        {rs.week && ` · Pete Plan Week ${rs.week}`}
+        {rs.totalTime != null && ` · ${rs.totalTime}m`}
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+        {rs.totalDistance != null && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Distance</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{rs.totalDistance.toLocaleString()}m</div>
+          </div>
+        )}
+        {rs.avgSplit != null && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Avg Split</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--green)' }}>{formatSplit(rs.avgSplit)}<span style={{ fontSize: 13, color: 'var(--text-muted)' }}>/500m</span></div>
+          </div>
+        )}
+        {rs.totalTime != null && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Time</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{rs.totalTime} min</div>
+          </div>
+        )}
+        {rs.avgSPM != null && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>SPM</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{rs.avgSPM}</div>
+          </div>
+        )}
+        {rs.calories != null && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Calories</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{rs.calories}</div>
+          </div>
+        )}
+        {rs.hr != null && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Heart Rate</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{rs.hr} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>bpm</span></div>
+          </div>
+        )}
+      </div>
+
+      {rs.intervals && rs.intervals.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Intervals</div>
+          <div className="set-labels" style={{ gridTemplateColumns: '32px 1fr 1fr 1fr 1fr' }}>
+            <span>Rep</span>
+            <span>Dist</span>
+            <span>Time</span>
+            <span>Split</span>
+            <span>SPM</span>
+          </div>
+          {rs.intervals.map((iv, idx) => (
+            <div key={idx} className="set-row" style={{ gridTemplateColumns: '32px 1fr 1fr 1fr 1fr', marginBottom: 2 }}>
+              <span className="set-num">{iv.rep}</span>
+              <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.distance ?? '—'}m</span>
+              <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.time ? `${iv.time}s` : '—'}</span>
+              <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>{formatSplit(iv.split)}</span>
+              <span style={{ textAlign: 'center', fontSize: 13 }}>{iv.spm ?? '—'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        className="btn btn-danger btn-full"
+        style={{ marginTop: 16 }}
+        onClick={() => setShowDeleteConfirm(true)}
+      >
+        <Trash2 size={14} /> Delete Session
+      </button>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Rowing Session"
+          message={`Delete this ${tl(rs.type)} session from ${new Date(rs.date).toLocaleDateString()}? This cannot be undone.`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={deleteRowingSession}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Unified item for the combined list
+type ListItem =
+  | { kind: 'lift'; session: Session; date: Date }
+  | { kind: 'rowing'; session: RowingSession; date: Date };
+
+const typeLabel = (t: string) => t === 'steady' ? 'Steady State' : t === 'distance' ? 'Distance' : 'Intervals';
+
 export function HistoryScreen() {
   const sessions = useLiveQuery(() => db.sessions.orderBy('date').reverse().toArray()) ?? [];
+  const rowingSessions = useLiveQuery(() => db.rowingSessions.orderBy('date').reverse().toArray()) ?? [];
   const allExercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
   const workouts = useLiveQuery(() => db.workouts.toArray()) ?? [];
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
+  const [filter, setFilter] = useState<FilterType>('all');
   const [selectedDaySessions, setSelectedDaySessions] = useState<Session[] | null>(null);
+  const [selectedRowingSession, setSelectedRowingSession] = useState<RowingSession | null>(null);
+  const showRowing = isRowingEnabled();
 
   const exMap = new Map(allExercises.map(e => [e.id!, e]));
   const wkMap = new Map(workouts.map(w => [w.id!, w]));
@@ -417,6 +573,30 @@ export function HistoryScreen() {
     return map;
   }, [sessions]);
 
+  const rowingByDate = useMemo(() => {
+    const map = new Map<string, RowingSession[]>();
+    for (const s of rowingSessions) {
+      const key = toDateKey(new Date(s.date));
+      const arr = map.get(key) ?? [];
+      arr.push(s);
+      map.set(key, arr);
+    }
+    return map;
+  }, [rowingSessions]);
+
+  // Combined and sorted list
+  const combinedList = useMemo(() => {
+    const items: ListItem[] = [];
+    if (filter !== 'rowing') {
+      for (const s of sessions) items.push({ kind: 'lift', session: s, date: new Date(s.date) });
+    }
+    if (filter !== 'lift' && showRowing) {
+      for (const s of rowingSessions) items.push({ kind: 'rowing', session: s, date: new Date(s.date) });
+    }
+    items.sort((a, b) => b.date.getTime() - a.date.getTime());
+    return items;
+  }, [sessions, rowingSessions, filter, showRowing]);
+
   if (selectedDaySessions) {
     return (
       <SessionDetail
@@ -428,6 +608,17 @@ export function HistoryScreen() {
       />
     );
   }
+
+  if (selectedRowingSession) {
+    return (
+      <RowingSessionDetail
+        session={selectedRowingSession}
+        onBack={() => setSelectedRowingSession(null)}
+      />
+    );
+  }
+
+  const totalSessions = sessions.length + (showRowing ? rowingSessions.length : 0);
 
   return (
     <div className="screen">
@@ -449,7 +640,30 @@ export function HistoryScreen() {
         </div>
       </div>
 
-      {sessions.length === 0 ? (
+      {/* Filter chips — only show if rowing is enabled */}
+      {showRowing && view === 'list' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {(['all', 'lift', 'rowing'] as FilterType[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                border: '1px solid var(--border)',
+                background: filter === f
+                  ? f === 'rowing' ? 'var(--green)' : f === 'lift' ? 'var(--accent)' : 'var(--accent)'
+                  : 'var(--bg-input)',
+                color: filter === f ? 'white' : 'var(--text-muted)',
+                cursor: 'pointer',
+              }}
+            >
+              {f === 'all' ? 'All' : f === 'lift' ? 'Lift' : 'Rowing'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {totalSessions === 0 ? (
         <div className="empty">
           <p>No sessions recorded yet. Start a workout in the Today tab.</p>
         </div>
@@ -457,38 +671,74 @@ export function HistoryScreen() {
         <CalendarView
           sessions={sessions}
           sessionsByDate={sessionsByDate}
+          rowingByDate={showRowing ? rowingByDate : new Map()}
           onSelectDate={setSelectedDaySessions}
         />
       ) : (
-        sessions.map(session => {
-          const wk = wkMap.get(session.workoutId);
-          const hasPB = session.exercises.some(
-            se => se.e10RM > 0 && se.e10RM >= (allTimeBest.get(se.exerciseId) ?? 0)
-          );
-
-          return (
-            <button
-              key={session.id}
-              className="list-item"
-              style={{ width: '100%' }}
-              onClick={() => setSelectedDaySessions([session])}
-            >
-              <div style={{ textAlign: 'left' }}>
-                <div className="title">
-                  {session.dayLabel}
-                  {hasPB && <span className="pb-badge">PB</span>}
+        combinedList.map((item) => {
+          if (item.kind === 'lift') {
+            const session = item.session;
+            const wk = wkMap.get(session.workoutId);
+            const hasPB = session.exercises.some(
+              se => se.e10RM > 0 && se.e10RM >= (allTimeBest.get(se.exerciseId) ?? 0)
+            );
+            return (
+              <button
+                key={`lift-${session.id}`}
+                className="list-item"
+                style={{ width: '100%' }}
+                onClick={() => setSelectedDaySessions([session])}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <div style={{
+                    width: 6, height: 32, borderRadius: 3, background: 'var(--accent)', flexShrink: 0,
+                  }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div className="title">
+                      <Dumbbell size={13} style={{ marginRight: 4, verticalAlign: -2 }} />
+                      {session.dayLabel}
+                      {hasPB && <span className="pb-badge">PB</span>}
+                    </div>
+                    <div className="subtitle">
+                      {item.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {wk && ` — ${wk.name}`}
+                      {session.durationMinutes != null && ` · ${session.durationMinutes}m`}
+                    </div>
+                  </div>
                 </div>
-                <div className="subtitle">
-                  {new Date(session.date).toLocaleDateString(undefined, {
-                    weekday: 'short', month: 'short', day: 'numeric'
-                  })}
-                  {wk && ` — ${wk.name}`}
-                  {session.durationMinutes != null && ` · ${session.durationMinutes}m`}
+                <ChevronRight size={18} color="var(--text-muted)" />
+              </button>
+            );
+          } else {
+            const rs = item.session;
+            return (
+              <button
+                key={`row-${rs.id}`}
+                className="list-item"
+                style={{ width: '100%' }}
+                onClick={() => setSelectedRowingSession(rs)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <div style={{
+                    width: 6, height: 32, borderRadius: 3, background: 'var(--green)', flexShrink: 0,
+                  }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div className="title">
+                      <Waves size={13} style={{ marginRight: 4, verticalAlign: -2 }} />
+                      {typeLabel(rs.type)}
+                      {rs.week && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}> · Wk {rs.week}</span>}
+                    </div>
+                    <div className="subtitle">
+                      {item.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {rs.totalDistance && ` · ${rs.totalDistance}m`}
+                      {rs.avgSplit && ` · ${formatSplit(rs.avgSplit)}/500m`}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <ChevronRight size={18} color="var(--text-muted)" />
-            </button>
-          );
+                <ChevronRight size={18} color="var(--text-muted)" />
+              </button>
+            );
+          }
         })
       )}
     </div>

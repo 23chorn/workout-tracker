@@ -728,11 +728,24 @@ function DeleteAllButton() {
   );
 }
 
-function HelpSection({ demo, demoLoading, onToggleDemo }: {
+function HelpSection({ demo, demoLoading, onToggleDemo, onRowingToggle }: {
   demo: boolean;
   demoLoading: boolean;
   onToggleDemo: () => void;
+  onRowingToggle?: () => void;
 }) {
+  const [rowingEnabled, setRowingEnabled] = useState(localStorage.getItem('lift-rowing-enabled') === '1');
+
+  const toggleRowing = () => {
+    const next = !rowingEnabled;
+    if (next) {
+      localStorage.setItem('lift-rowing-enabled', '1');
+    } else {
+      localStorage.removeItem('lift-rowing-enabled');
+    }
+    setRowingEnabled(next);
+    onRowingToggle?.();
+  };
   return (
     <div>
       <h2>Progression Badges</h2>
@@ -847,6 +860,30 @@ function HelpSection({ demo, demoLoading, onToggleDemo }: {
       </div>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 16 }}>Modules</h2>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Rowing</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pete Plan + freeform rowing tracker</div>
+          </div>
+          <button
+            onClick={toggleRowing}
+            style={{
+              width: 48, height: 28, borderRadius: 14, padding: 2, cursor: 'pointer',
+              background: rowingEnabled ? 'var(--accent)' : 'var(--border)',
+              border: 'none', transition: 'background 0.2s', position: 'relative',
+            }}
+          >
+            <div style={{
+              width: 24, height: 24, borderRadius: 12, background: 'white',
+              transition: 'transform 0.2s',
+              transform: rowingEnabled ? 'translateX(20px)' : 'translateX(0)',
+            }} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
         <h2 style={{ fontSize: 16 }}>Demo Mode</h2>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
           Load sample data to explore the app. Your real data is kept separate and unaffected.
@@ -873,7 +910,7 @@ function HelpSection({ demo, demoLoading, onToggleDemo }: {
   );
 }
 
-export function ManageScreen() {
+export function ManageScreen({ onRowingToggle }: { onRowingToggle?: () => void }) {
   const [tab, setTab] = useState<Tab>('exercises');
   const [showHelp, setShowHelp] = useState(false);
   const [demo, setDemo] = useState(isDemoMode);
@@ -957,7 +994,7 @@ export function ManageScreen() {
                 <X size={14} />
               </button>
             </div>
-            <HelpSection demo={demo} demoLoading={demoLoading} onToggleDemo={toggleDemo} />
+            <HelpSection demo={demo} demoLoading={demoLoading} onToggleDemo={toggleDemo} onRowingToggle={onRowingToggle} />
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { db } from './database';
+import { seedRowingPrograms } from './rowingSeed';
 import { sessionE10RM } from '../utils/e10rm';
 
 const DEMO_FLAG_KEY = 'lift-demo-mode';
@@ -9,6 +10,10 @@ export function isDemoMode(): boolean {
 
 export async function enableDemo(): Promise<void> {
   localStorage.setItem(DEMO_FLAG_KEY, '1');
+  localStorage.setItem('lift-rowing-enabled', '1');
+  // Delete the demo DB entirely so it rebuilds fresh
+  const { default: Dexie } = await import('dexie');
+  await Dexie.delete('LiftDB-Demo');
   window.location.reload();
 }
 
@@ -19,8 +24,20 @@ export async function disableDemo(): Promise<void> {
 
 export async function ensureDemoData(): Promise<void> {
   const count = await db.sessions.count();
-  if (count > 0) return;
-  await generateDemoData();
+  if (count === 0) {
+    await generateDemoData();
+  }
+  // Ensure rowing programs are seeded in demo DB
+  await seedRowingPrograms();
+  // Regenerate rowing data if missing or if seed version changed
+  const rowingVersion = localStorage.getItem('lift-demo-rowing-version') ?? '0';
+  const rowingCount = await db.rowingSessions.count();
+  if (rowingCount === 0 || rowingVersion !== '2') {
+    await db.rowingSessions.clear();
+    await db.rowingProgress.clear();
+    await generateDemoRowingData();
+    localStorage.setItem('lift-demo-rowing-version', '2');
+  }
 }
 
 // Helpers
@@ -224,4 +241,131 @@ async function generateDemoData() {
   }
 
   await db.sessions.bulkAdd(sessions);
+}
+
+// Generate 7 weeks of rowing data for demo mode
+async function generateDemoRowingData() {
+  const programs = await db.rowingPrograms.toArray();
+  const petePlan = programs.find(p => p.name === 'Pete Plan');
+  if (!petePlan?.id) return;
+
+  // Set up progress at week 8 (completed 7 weeks)
+  await db.rowingProgress.clear();
+  await db.rowingProgress.add({
+    currentProgramId: petePlan.id,
+    currentWeek: 8,
+    completedSessionIds: [],
+  });
+
+  const now = new Date();
+  const rowingSessions: {
+    date: string;
+    durationMinutes?: number;
+    programId: number;
+    week: number;
+    day: number;
+    optional: boolean;
+    type: 'steady' | 'distance' | 'intervals';
+    totalTime?: number;
+    totalDistance?: number;
+    avgSplit?: number;
+    avgSPM?: number;
+    calories?: number;
+    hr?: number;
+    intervals?: { rep: number; distance?: number; time?: number; split: number; spm?: number }[];
+  }[] = [];
+
+  // Base split that improves over weeks (seconds per 500m)
+  const baseSplit = 135; // 2:15 /500m starting
+
+  for (let week = 1; week <= 7; week++) {
+    const weekData = petePlan.weeks.find(w => w.week === week);
+    if (!weekData) continue;
+
+    // Improvement: ~0.5s per week
+    const weekSplit = baseSplit - week * 0.5;
+    const skipOptional = Math.random() < 0.4;
+
+    for (const session of weekData.sessions) {
+      if (session.optional && skipOptional) continue;
+
+      // Session date: week N maps to N weeks ago, spread across Mon/Wed/Fri/Sat/Sun
+      const dayOffsets = [0, 2, 4, 5, 6];
+      const dayOffset = dayOffsets[session.day - 1] ?? session.day - 1;
+      const sessionDate = new Date(now);
+      sessionDate.setDate(now.getDate() - (7 - week + 1) * 7 + dayOffset);
+      sessionDate.setHours(6 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60));
+
+      const splitVariance = () => weekSplit + (Math.random() * 4 - 2);
+      const spmVariance = () => Math.floor(22 + Math.random() * 6);
+
+      if (session.type === 'intervals' && session.reps) {
+        const reps = session.reps;
+        const repDist = session.repDistance ?? 500;
+        const ivs = Array.from({ length: reps }, (_, i) => {
+          const split = splitVariance() + (i * 0.3); // slight fatigue
+          return {
+            rep: i + 1,
+            distance: repDist,
+            time: Math.round((repDist / 500) * split),
+            split: Math.round(split * 10) / 10,
+            spm: spmVariance(),
+          };
+        });
+        const totalDist = reps * repDist;
+        const avgSplit = ivs.reduce((s, iv) => s + iv.split, 0) / ivs.length;
+        rowingSessions.push({
+          date: sessionDate.toISOString(),
+          durationMinutes: Math.floor(jitter(30, 0.2)),
+          programId: petePlan.id,
+          week, day: session.day, optional: !!session.optional,
+          type: 'intervals',
+          totalDistance: totalDist,
+          totalTime: Math.round(ivs.reduce((s, iv) => s + (iv.time ?? 0), 0) / 60),
+          avgSplit: Math.round(avgSplit * 10) / 10,
+          avgSPM: Math.round(ivs.reduce((s, iv) => s + (iv.spm ?? 0), 0) / ivs.length),
+          calories: Math.round(totalDist * 0.04),
+          hr: Math.floor(jitter(155, 0.05)),
+          intervals: ivs,
+        });
+      } else if (session.type === 'distance' && session.repDistance) {
+        const dist = session.repDistance;
+        const split = splitVariance() + 3; // steady is slower
+        const totalTime = Math.round((dist / 500) * split / 60);
+        rowingSessions.push({
+          date: sessionDate.toISOString(),
+          durationMinutes: totalTime,
+          programId: petePlan.id,
+          week, day: session.day, optional: !!session.optional,
+          type: 'distance',
+          totalDistance: dist,
+          totalTime,
+          avgSplit: Math.round(split * 10) / 10,
+          avgSPM: Math.floor(jitter(22, 0.05)),
+          calories: Math.round(dist * 0.04),
+          hr: Math.floor(jitter(145, 0.05)),
+        });
+      } else {
+        // Steady state / time-based
+        const minutes = session.repMinutes ?? 20;
+        const split = splitVariance() + 5; // easy pace
+        const dist = Math.round((minutes * 60 / split) * 500);
+        rowingSessions.push({
+          date: sessionDate.toISOString(),
+          durationMinutes: minutes,
+          programId: petePlan.id,
+          week, day: session.day, optional: !!session.optional,
+          type: 'steady',
+          totalDistance: dist,
+          totalTime: minutes,
+          avgSplit: Math.round(split * 10) / 10,
+          avgSPM: Math.floor(jitter(20, 0.05)),
+          calories: Math.round(dist * 0.035),
+          hr: Math.floor(jitter(135, 0.05)),
+        });
+      }
+    }
+  }
+
+  await db.rowingSessions.bulkAdd(rowingSessions);
 }

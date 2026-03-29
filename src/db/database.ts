@@ -77,12 +77,68 @@ export interface ActiveSession {
   restTimerTotal?: number;
 }
 
+// Rowing types
+
+export interface RowingProgramSession {
+  day: number;
+  type: 'steady' | 'distance' | 'intervals';
+  target: string;
+  reps?: number;
+  repDistance?: number;
+  repMinutes?: number;
+  restSeconds?: number;
+  optional?: boolean;
+  guidance?: string;
+}
+
+export interface RowingProgram {
+  id?: number;
+  name: string;
+  type: 'structured' | 'freeform';
+  weeks: { week: number; sessions: RowingProgramSession[] }[];
+}
+
+export interface RowingProgress {
+  id?: number;
+  currentProgramId: number;
+  currentWeek: number;
+  completedSessionIds: number[];
+}
+
+export interface RowingInterval {
+  rep: number;
+  distance?: number;
+  time?: number;
+  split: number;
+  spm?: number;
+}
+
+export interface RowingSession {
+  id?: number;
+  date: string;
+  programId?: number;
+  week?: number;
+  day?: number;
+  optional?: boolean;
+  type: 'steady' | 'distance' | 'intervals';
+  totalTime?: number;
+  totalDistance?: number;
+  avgSplit?: number;
+  avgSPM?: number;
+  calories?: number;
+  hr?: number;
+  intervals?: RowingInterval[];
+}
+
 type LiftDB = Dexie & {
   exercises: EntityTable<Exercise, 'id'>;
   workouts: EntityTable<Workout, 'id'>;
   programs: EntityTable<Program, 'id'>;
   sessions: EntityTable<Session, 'id'>;
   activeSession: EntityTable<ActiveSession, 'id'>;
+  rowingPrograms: EntityTable<RowingProgram, 'id'>;
+  rowingProgress: EntityTable<RowingProgress, 'id'>;
+  rowingSessions: EntityTable<RowingSession, 'id'>;
 };
 
 function createDB(name: string): LiftDB {
@@ -106,6 +162,16 @@ function createDB(name: string): LiftDB {
     programs: '++id, name',
     sessions: '++id, date, programId, workoutId',
     activeSession: '++id',
+  });
+  d.version(4).stores({
+    exercises: '++id, name, muscleGroup',
+    workouts: '++id, name',
+    programs: '++id, name',
+    sessions: '++id, date, programId, workoutId',
+    activeSession: '++id',
+    rowingPrograms: '++id, name',
+    rowingProgress: '++id, currentProgramId',
+    rowingSessions: '++id, date, type, programId',
   });
   return d;
 }
