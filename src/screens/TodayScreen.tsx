@@ -5,10 +5,10 @@ import { getSuggestion } from '../utils/progression';
 import { calcE10RM, sessionE10RM } from '../utils/e10rm';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
-import { Check, X, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
-import { StatCard } from '../components/StatCard';
+import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
 
 interface ExerciseState {
   exerciseId: number;
@@ -39,14 +39,7 @@ export function TodayScreen() {
   const [confirmedSets, setConfirmedSets] = useState<Set<string>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
-  const [summary, setSummary] = useState<{
-    dayLabel: string;
-    duration: number;
-    exerciseCount: number;
-    totalSets: number;
-    totalVolume: number;
-    pbs: { name: string; e10RM: number }[];
-  } | null>(null);
+  const [summary, setSummary] = useState<SessionSummaryData | null>(null);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
 
@@ -68,6 +61,8 @@ export function TodayScreen() {
   const [workoutId, setWorkoutId] = useState<number>(0);
   const [startedAt, setStartedAt] = useState('');
   const timer = useRestTimer();
+  const inlineTimerRef = useRef<HTMLDivElement>(null);
+  const [inlineTimerVisible, setInlineTimerVisible] = useState(true);
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedProgram = programs.find(p => p.id === selectedProgramId) ?? null;
@@ -130,17 +125,21 @@ export function TodayScreen() {
         numSets: s.numSets,
       })));
 
-      // Restore confirmed sets
+      // Restore confirmed sets and auto-collapse fully confirmed exercises
       if (active.confirmedSets?.length) {
-        setConfirmedSets(new Set(active.confirmedSets));
+        const restored = new Set(active.confirmedSets);
+        setConfirmedSets(restored);
+        const collapsed = new Set<number>();
+        active.exerciseStates.forEach((es, exIdx) => {
+          const allDone = es.sets.every((_: unknown, si: number) => restored.has(`${exIdx}-${si}`));
+          if (allDone) collapsed.add(exIdx);
+        });
+        setCollapsedExercises(collapsed);
       }
 
-      // Restore rest timer if still running
+      // Restore rest timer with original total for correct progress bar
       if (active.restTimerEnd && active.restTimerTotal) {
-        const remaining = Math.floor((new Date(active.restTimerEnd).getTime() - Date.now()) / 1000);
-        if (remaining > 0) {
-          timer.start(remaining);
-        }
+        timer.resume(new Date(active.restTimerEnd).getTime(), active.restTimerTotal);
       }
 
       setSessionActive(true);
@@ -222,6 +221,21 @@ export function TodayScreen() {
       persistSession(next);
       return next;
     });
+    // Auto-unconfirm if weight or reps is cleared
+    const setKey = `${exIdx}-${setIdx}`;
+    if (value === '' && confirmedSets.has(setKey)) {
+      setConfirmedSets(prev => {
+        const next = new Set(prev);
+        next.delete(setKey);
+        setCollapsedExercises(cp => { const n = new Set(cp); n.delete(exIdx); return n; });
+        db.activeSession.toArray().then(saved => {
+          if (saved.length > 0) {
+            db.activeSession.update(saved[0].id!, { confirmedSets: [...next] });
+          }
+        });
+        return next;
+      });
+    }
   };
 
   const toggleWorking = (exIdx: number, setIdx: number) => {
@@ -421,57 +435,38 @@ export function TodayScreen() {
     timer.clear();
   };
 
-  // Live elapsed time in seconds
+  // Track if inline timer is scrolled out of view
+  useEffect(() => {
+    const el = inlineTimerRef.current;
+    if (!el) { setInlineTimerVisible(true); return; }
+    const screen = el.closest('.screen');
+    if (!screen) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInlineTimerVisible(entry.isIntersecting),
+      { root: screen, threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
+  // Live elapsed time — always computed from startedAt timestamp
   const [elapsedSec, setElapsedSec] = useState(0);
   useEffect(() => {
     if (!sessionActive || !startedAt) return;
-    const start = new Date(startedAt).getTime();
-    setElapsedSec(Math.floor((Date.now() - start) / 1000));
-    const id = window.setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
+    const startMs = new Date(startedAt).getTime();
+    const tick = () => setElapsedSec(Math.floor((Date.now() - startMs) / 1000));
+    tick();
+    const id = window.setInterval(tick, 500);
     return () => clearInterval(id);
   }, [sessionActive, startedAt]);
 
   if (summary) {
-    const formatVolume = (kg: number) => {
-      if (kg >= 1000) return `${(kg / 1000).toFixed(1)}K kg`;
-      return `${Math.round(kg)} kg`;
-    };
     return (
       <div className="screen">
-        <div style={{ textAlign: 'center', paddingTop: 20 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>&#10003;</div>
-          <h1 style={{ marginBottom: 4 }}>Session Complete</h1>
-          <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>{summary.dayLabel}</p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <StatCard label="Duration" value={`${summary.duration}m`} />
-          <StatCard label="Exercises" value={summary.exerciseCount} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-          <StatCard label="Total Sets" value={summary.totalSets} />
-          <StatCard label="Volume" value={formatVolume(summary.totalVolume)} />
-        </div>
-
-        {summary.pbs.length > 0 && (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="pb-badge">PB</span> New Personal Bests
-            </div>
-            {summary.pbs.map((pb, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
-                <span style={{ fontSize: 14 }}>{pb.name}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--yellow)' }}>{pb.e10RM.toFixed(1)} kg</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button className="btn btn-primary btn-full" onClick={() => { setSummary(null); setSelectedDayLabel(null); }}>
-          Done
-        </button>
+        <SessionSummary
+          data={summary}
+          onDismiss={() => { setSummary(null); setSelectedDayLabel(null); }}
+        />
       </div>
     );
   }
@@ -566,23 +561,37 @@ export function TodayScreen() {
             {workoutName} &middot; {Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')} elapsed
           </div>
         </div>
-        <button className="btn btn-sm btn-danger" onClick={cancelSession}>
-          <X size={16} /> Cancel
-        </button>
       </div>
+
+      {/* Sticky timer when inline is scrolled out of view */}
+      {timer.active && confirmedSets.size > 0 && !inlineTimerVisible && (
+        <div className="timer-bar" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
+              {timer.expired ? 'Rest Over' : 'Rest Timer'}
+            </div>
+            <div className="timer-display" style={{ color: timer.expired ? 'var(--red)' : 'var(--text)' }}>
+              {timer.expired ? '+' : ''}{Math.floor(Math.abs(timer.remaining) / 60)}:{String(Math.abs(timer.remaining) % 60).padStart(2, '0')}
+            </div>
+            {!timer.expired && (
+              <div className="timer-progress">
+                <div className="timer-progress-fill" style={{ width: `${Math.min(100, ((timer.total - timer.remaining) / timer.total) * 100)}%` }} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {exerciseStates.map((es, exIdx) => {
         const exercise = exercises.get(es.exerciseId);
         if (!exercise) return null;
 
-        // Check if all sets in this exercise are confirmed
         const allConfirmed = es.sets.length > 0 && es.sets.every((_, setIdx) => confirmedSets.has(`${exIdx}-${setIdx}`));
 
-        // Find the first uncompleted exercise index for timer positioning
         const firstUncompletedIdx = exerciseStates.findIndex((e, i) =>
           !e.sets.every((_, si) => confirmedSets.has(`${i}-${si}`))
         );
-        const showTimerHere = timer.active && exIdx === firstUncompletedIdx;
+        const showTimerHere = timer.active && confirmedSets.size > 0 && exIdx === firstUncompletedIdx;
 
         const filledSets = es.sets
           .filter(s => s.weight && s.reps && s.isWorkingSet)
@@ -592,20 +601,23 @@ export function TodayScreen() {
         return (
           <div key={`${es.exerciseId}-${exIdx}`}>
           {showTimerHere && (
-            <div className="timer-bar">
+            <div className="timer-bar" ref={inlineTimerRef}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Rest Timer</div>
-                <div className="timer-display">
-                  {Math.floor(timer.remaining / 60)}:{String(timer.remaining % 60).padStart(2, '0')}
+                <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
+                  {timer.expired ? 'Rest Over' : 'Rest Timer'}
                 </div>
-                <div className="timer-progress">
-                  <div
-                    className="timer-progress-fill"
-                    style={{ width: `${((timer.total - timer.remaining) / timer.total) * 100}%` }}
-                  />
+                <div className="timer-display" style={{ color: timer.expired ? 'var(--red)' : 'var(--text)' }}>
+                  {timer.expired ? '+' : ''}{Math.floor(Math.abs(timer.remaining) / 60)}:{String(Math.abs(timer.remaining) % 60).padStart(2, '0')}
                 </div>
+                {!timer.expired && (
+                  <div className="timer-progress">
+                    <div
+                      className="timer-progress-fill"
+                      style={{ width: `${Math.min(100, ((timer.total - timer.remaining) / timer.total) * 100)}%` }}
+                    />
+                  </div>
+                )}
               </div>
-              <button className="btn btn-sm btn-secondary" onClick={timer.clear}>Skip</button>
             </div>
           )}
           {collapsedExercises.has(exIdx) ? (
@@ -780,15 +792,28 @@ export function TodayScreen() {
                       width: 32, height: 32, fontSize: 14,
                     }}
                     onClick={() => {
-                      if (isFilled && !isConfirmed) {
+                      if (isConfirmed) {
+                        // Un-confirm: toggle back to grey/green
+                        setConfirmedSets(prev => {
+                          const next = new Set(prev);
+                          next.delete(setKey);
+                          // Un-collapse the exercise if it was auto-collapsed
+                          setCollapsedExercises(cp => { const n = new Set(cp); n.delete(exIdx); return n; });
+                          db.activeSession.toArray().then(saved => {
+                            if (saved.length > 0) {
+                              db.activeSession.update(saved[0].id!, { confirmedSets: [...next] });
+                            }
+                          });
+                          return next;
+                        });
+                      } else if (isFilled) {
+                        // Confirm
                         setConfirmedSets(prev => {
                           const next = new Set(prev).add(setKey);
-                          // Auto-collapse if all sets in this exercise are now confirmed
                           const allDone = es.sets.every((_, si) => next.has(`${exIdx}-${si}`));
                           if (allDone) {
                             setCollapsedExercises(cp => new Set(cp).add(exIdx));
                           }
-                          // Persist confirmed sets immediately
                           db.activeSession.toArray().then(saved => {
                             if (saved.length > 0) {
                               db.activeSession.update(saved[0].id!, { confirmedSets: [...next] });
@@ -799,8 +824,8 @@ export function TodayScreen() {
                         logSet(es.restSeconds);
                       }
                     }}
-                    disabled={!isFilled || isConfirmed}
-                    aria-label={isConfirmed ? 'Set confirmed' : 'Confirm set'}
+                    disabled={!isFilled && !isConfirmed}
+                    aria-label={isConfirmed ? 'Undo confirm' : 'Confirm set'}
                   >
                     <Check size={14} />
                   </button>
@@ -851,6 +876,14 @@ export function TodayScreen() {
 
       <button className="btn btn-primary btn-full mt-sm" onClick={completeSession}>
         <Check size={18} /> Complete Session
+      </button>
+
+      <button
+        className="btn btn-full"
+        style={{ marginTop: 24, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 13 }}
+        onClick={cancelSession}
+      >
+        End Session Without Saving
       </button>
 
       {showAddExercise && (

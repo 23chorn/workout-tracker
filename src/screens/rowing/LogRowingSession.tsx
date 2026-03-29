@@ -55,7 +55,7 @@ export function LogRowingSession({ prescription, programId, week, onComplete, on
       ? intervals.map((iv, i) => ({
           rep: i + 1,
           distance: iv.distance ? parseFloat(iv.distance) : undefined,
-          time: iv.time ? parseFloat(iv.time) : undefined,
+          time: iv.time ? (parseSplit(iv.time) ?? parseFloat(iv.time)) : undefined,
           split: parseSplit(iv.split) ?? 0,
           spm: iv.spm ? parseInt(iv.spm) : undefined,
         })).filter(iv => iv.split > 0)
@@ -72,7 +72,7 @@ export function LogRowingSession({ prescription, programId, week, onComplete, on
       day: prescription?.day,
       optional: prescription?.optional,
       type,
-      totalTime: totalTime ? parseFloat(totalTime) : undefined,
+      totalTime: totalTime ? (parseSplit(totalTime) ?? parseFloat(totalTime) * 60) / 60 : undefined,
       totalDistance: totalDistance ? parseFloat(totalDistance) : undefined,
       avgSplit: computedAvgSplit,
       avgSPM: avgSPM ? parseInt(avgSPM) : undefined,
@@ -121,8 +121,8 @@ export function LogRowingSession({ prescription, programId, week, onComplete, on
                   <input type="number" inputMode="numeric" value={iv.distance} onChange={e => updateInterval(idx, 'distance', e.target.value)} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Time (sec)</label>
-                  <input type="number" inputMode="decimal" value={iv.time} onChange={e => updateInterval(idx, 'time', e.target.value)} />
+                  <label>Time</label>
+                  <input placeholder="1:45" value={iv.time} onChange={e => updateInterval(idx, 'time', e.target.value)} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Split (/500m)</label>
@@ -143,8 +143,8 @@ export function LogRowingSession({ prescription, programId, week, onComplete, on
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div className="form-group">
-          <label>Total Time (min)</label>
-          <input type="number" inputMode="decimal" value={totalTime} onChange={e => setTotalTime(e.target.value)} />
+          <label>Total Time</label>
+          <input placeholder="25:30" value={totalTime} onChange={e => setTotalTime(e.target.value)} />
         </div>
         <div className="form-group">
           <label>Total Distance (m)</label>

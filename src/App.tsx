@@ -6,32 +6,31 @@ import { StatsScreen } from './screens/StatsScreen';
 import { ManageScreen } from './screens/ManageScreen';
 import { RowingScreen } from './screens/rowing/RowingScreen';
 
-type TabId = 'today' | 'history' | 'rowing' | 'stats' | 'manage';
+type TabId = 'lift' | 'rowing' | 'history' | 'stats' | 'manage';
 
 export function isRowingEnabled(): boolean {
   return localStorage.getItem('lift-rowing-enabled') === '1';
 }
 
 export function App() {
-  const [tab, setTab] = useState<TabId>('today');
+  const [tab, setTab] = useState<TabId>('lift');
   const [rowingEnabled, setRowingEnabled] = useState(isRowingEnabled);
 
-  // Listen for changes from Manage screen
   const refreshRowing = () => setRowingEnabled(isRowingEnabled());
 
   const tabs: { id: TabId; icon: typeof Dumbbell; label: string }[] = [
-    { id: 'today', icon: Dumbbell, label: 'Today' },
+    { id: 'lift', icon: Dumbbell, label: 'Lift' },
+    ...(rowingEnabled ? [{ id: 'rowing' as TabId, icon: Waves, label: 'Row' }] : []),
     { id: 'history', icon: Clock, label: 'History' },
-    ...(rowingEnabled ? [{ id: 'rowing' as TabId, icon: Waves, label: 'Rowing' }] : []),
     { id: 'stats', icon: BarChart3, label: 'Stats' },
     { id: 'manage', icon: Settings, label: 'Manage' },
   ];
 
   return (
     <div className="app">
-      {tab === 'today' && <TodayScreen />}
-      {tab === 'history' && <HistoryScreen />}
+      {tab === 'lift' && <TodayScreen />}
       {tab === 'rowing' && rowingEnabled && <RowingScreen />}
+      {tab === 'history' && <HistoryScreen />}
       {tab === 'stats' && <StatsScreen />}
       {tab === 'manage' && <ManageScreen onRowingToggle={refreshRowing} />}
 

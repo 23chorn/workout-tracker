@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { db, type Session } from '../../db/database';
 import { sessionE10RM } from '../../utils/e10rm';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { SessionSummary } from '../SessionSummary';
 import { E10RMChart } from './E10RMChart';
-import { ChevronLeft, Trash2, Pencil } from 'lucide-react';
+import { ChevronLeft, Trash2, Pencil, BarChart3 } from 'lucide-react';
 
 export function SessionDetail({ sessions: daySessions, allSessions, exMap, allTimeBest, onBack }: {
   sessions: Session[];
@@ -14,6 +15,7 @@ export function SessionDetail({ sessions: daySessions, allSessions, exMap, allTi
 }) {
   const [selected, setSelected] = useState<Session>(daySessions[0]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editSets, setEditSets] = useState<{ weight: string; reps: string; isWorkingSet: boolean }[][]>([]);
 
@@ -48,6 +50,47 @@ export function SessionDetail({ sessions: daySessions, allSessions, exMap, allTi
     onBack();
   };
 
+  const summaryData = useMemo(() => {
+    let totalSets = 0;
+    let totalVolume = 0;
+    let exerciseCount = 0;
+    const pbs: { name: string; e10RM: number }[] = [];
+
+    for (const se of selected.exercises) {
+      if (se.sets.length > 0) exerciseCount++;
+      for (const set of se.sets) {
+        totalSets++;
+        totalVolume += set.weight * set.reps;
+      }
+      if (se.e10RM > 0 && se.e10RM >= (allTimeBest.get(se.exerciseId) ?? 0)) {
+        const ex = exMap.get(se.exerciseId);
+        if (ex) pbs.push({ name: ex.name, e10RM: se.e10RM });
+      }
+    }
+
+    return {
+      dayLabel: selected.dayLabel,
+      date: selected.date,
+      duration: selected.durationMinutes,
+      exerciseCount, totalSets, totalVolume, pbs,
+    };
+  }, [selected, allTimeBest, exMap]);
+
+  if (showSummary) {
+    return (
+      <div className="screen">
+        <button className="btn btn-sm btn-secondary mb-md" onClick={() => setShowSummary(false)}>
+          <ChevronLeft size={16} /> Details
+        </button>
+        <SessionSummary
+          data={summaryData}
+          onDismiss={() => setShowSummary(false)}
+          dismissLabel="Back to Details"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="screen">
       <button className="btn btn-sm btn-secondary mb-md" onClick={onBack}>
@@ -69,7 +112,10 @@ export function SessionDetail({ sessions: daySessions, allSessions, exMap, allTi
       )}
 
       {!editing && (
-        <button className="btn btn-sm btn-secondary mb-md" onClick={startEditing}><Pencil size={14} /> Edit Session</button>
+        <div className="row gap-sm mb-md">
+          <button className="btn btn-sm btn-secondary" onClick={() => setShowSummary(true)}><BarChart3 size={14} /> Summary</button>
+          <button className="btn btn-sm btn-secondary" onClick={startEditing}><Pencil size={14} /> Edit</button>
+        </div>
       )}
       {editing && (
         <div className="row" style={{ marginBottom: 12 }}>
