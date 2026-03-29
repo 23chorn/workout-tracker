@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Exercise } from '../db/database';
 import { Plus } from 'lucide-react';
+import { MuscleGroupChips } from './MuscleGroupChips';
 
 function relativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -119,24 +120,7 @@ export function ExercisePicker({ exercises, suggestBy, onAdd, onClose }: {
           autoFocus
         />
 
-        {/* Muscle group filter chips */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-          {muscleGroups.map(mg => (
-            <button
-              key={mg}
-              onClick={() => { setMuscleFilter(muscleFilter === mg ? null : mg); setSearch(''); }}
-              style={{
-                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                border: '1px solid var(--border)',
-                background: muscleFilter === mg ? 'var(--accent)' : 'var(--bg-input)',
-                color: muscleFilter === mg ? 'white' : 'var(--text-muted)',
-                cursor: 'pointer',
-              }}
-            >
-              {mg}
-            </button>
-          ))}
-        </div>
+        <MuscleGroupChips groups={muscleGroups} selected={muscleFilter} onSelect={(mg) => { setMuscleFilter(mg); setSearch(''); }} />
 
         <div style={{ maxHeight: '45vh', overflowY: 'auto' }}>
           {/* Search mode */}

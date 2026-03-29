@@ -4,12 +4,7 @@ import { LogRowingSession } from './LogRowingSession';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ChevronRight, ChevronLeft, ChevronDown, Check, Map, Info, X } from 'lucide-react';
 import { SESSION_INFO } from '../../db/petePlan';
-
-function formatSplit(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
+import { formatSplit } from '../../utils/date';
 
 function getPhase(week: number) {
   const phase = week <= 8 ? 1 : week <= 16 ? 2 : 3;

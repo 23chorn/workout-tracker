@@ -1,12 +1,7 @@
 import { useState, useMemo } from 'react';
 import { type RowingSession } from '../../db/database';
+import { formatSplit } from '../../utils/date';
 import { ChevronDown, Trophy } from 'lucide-react';
-
-function formatSplit(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
 
 function getWeekKey(date: Date): string {
   const d = new Date(date);

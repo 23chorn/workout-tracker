@@ -8,6 +8,7 @@ import { useRestTimer } from '../hooks/useRestTimer';
 import { Check, X, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
+import { StatCard } from '../components/StatCard';
 
 interface ExerciseState {
   exerciseId: number;
@@ -446,24 +447,12 @@ export function TodayScreen() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <div className="card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Duration</div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.duration}m</div>
-          </div>
-          <div className="card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Exercises</div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.exerciseCount}</div>
-          </div>
+          <StatCard label="Duration" value={`${summary.duration}m`} />
+          <StatCard label="Exercises" value={summary.exerciseCount} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-          <div className="card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Total Sets</div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{summary.totalSets}</div>
-          </div>
-          <div className="card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Volume</div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{formatVolume(summary.totalVolume)}</div>
-          </div>
+          <StatCard label="Total Sets" value={summary.totalSets} />
+          <StatCard label="Volume" value={formatVolume(summary.totalVolume)} />
         </div>
 
         {summary.pbs.length > 0 && (
