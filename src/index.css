@@ -470,6 +470,8 @@ select {
   justify-content: center;
   z-index: 200;
   padding: 16px;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .modal {
@@ -481,6 +483,14 @@ select {
   max-height: 85vh;
   overflow-y: auto;
   padding: 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal input,
+.modal select {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
 }
 
 .modal h2 {
