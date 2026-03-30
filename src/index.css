@@ -228,6 +228,33 @@ select {
   font-size: 16px;
 }
 
+.picker-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  width: 100%;
+}
+
+.picker-input:active {
+  background: var(--border);
+}
+
+.picker-input .placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .set-row .working-toggle {
   width: 36px;
   height: 36px;

@@ -9,6 +9,7 @@ import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucid
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
+import { ScrollPicker, weightValues, repValues } from '../components/ScrollPicker';
 
 interface ExerciseState {
   exerciseId: number;
@@ -39,6 +40,10 @@ export function TodayScreen() {
   const [confirmedSets, setConfirmedSets] = useState<Set<string>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [picker, setPicker] = useState<{ exIdx: number; setIdx: number; field: 'weight' | 'reps' } | null>(null);
+
+  const WEIGHTS = weightValues();
+  const REPS = repValues();
   const [summary, setSummary] = useState<SessionSummaryData | null>(null);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
@@ -513,8 +518,15 @@ export function TodayScreen() {
                       className="card"
                       style={{ cursor: 'pointer', textAlign: 'left', width: '100%' }}
                       onClick={() => {
-                        setSelectedDayLabel(dayLabel);
-                        loadSession(selectedProgram.id!, selectedProgram.name, dayLabel, day.workoutId);
+                        setConfirmAction({
+                          title: 'Start Session',
+                          message: `Start ${wk?.name ?? dayLabel}?`,
+                          onConfirm: () => {
+                            setConfirmAction(null);
+                            setSelectedDayLabel(dayLabel);
+                            loadSession(selectedProgram.id!, selectedProgram.name, dayLabel, day.workoutId);
+                          },
+                        });
                       }}
                     >
                       <div className="row-between" style={{ marginBottom: exNames.length > 0 ? 8 : 0 }}>
@@ -535,6 +547,16 @@ export function TodayScreen() {
               </div>
             )}
           </>
+        )}
+
+        {confirmAction && (
+          <ConfirmDialog
+            title={confirmAction.title}
+            message={confirmAction.message}
+            confirmLabel="Start"
+            onConfirm={confirmAction.onConfirm}
+            onCancel={() => setConfirmAction(null)}
+          />
         )}
       </div>
     );
@@ -766,20 +788,18 @@ export function TodayScreen() {
               return (
                 <div className="set-row" key={setIdx} style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px' }}>
                   <span className="set-num">{setIdx + 1}</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="kg"
-                    value={set.weight}
-                    onChange={e => updateSet(exIdx, setIdx, 'weight', e.target.value)}
-                  />
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="reps"
-                    value={set.reps}
-                    onChange={e => updateSet(exIdx, setIdx, 'reps', e.target.value)}
-                  />
+                  <button
+                    className="picker-input"
+                    onClick={() => setPicker({ exIdx, setIdx, field: 'weight' })}
+                  >
+                    {set.weight ? <span>{set.weight}</span> : <span className="placeholder">kg</span>}
+                  </button>
+                  <button
+                    className="picker-input"
+                    onClick={() => setPicker({ exIdx, setIdx, field: 'reps' })}
+                  >
+                    {set.reps ? <span>{set.reps}</span> : <span className="placeholder">reps</span>}
+                  </button>
                   <span style={{ textAlign: 'center', fontSize: 12, color: setE10rm > 0 ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                     {setE10rm > 0 ? setE10rm.toFixed(0) : '—'}
                   </span>
@@ -909,6 +929,26 @@ export function TodayScreen() {
           destructive
           onConfirm={confirmAction.onConfirm}
           onCancel={() => setConfirmAction(null)}
+        />
+      )}
+
+      {picker && (
+        <ScrollPicker
+          label={picker.field === 'weight' ? 'Weight (kg)' : 'Reps'}
+          values={picker.field === 'weight' ? WEIGHTS : REPS}
+          value={(() => {
+            const es = exerciseStates[picker.exIdx];
+            const set = es?.sets[picker.setIdx];
+            if (picker.field === 'weight') {
+              return set?.weight || (es?.suggestedWeight ? String(es.suggestedWeight) : '20');
+            }
+            // Default reps to midpoint of rep range
+            const mid = es ? Math.round((es.repRange[0] + es.repRange[1]) / 2) : 10;
+            return set?.reps || String(mid);
+          })()}
+          suffix={picker.field === 'weight' ? 'kg' : undefined}
+          onChange={(val) => updateSet(picker.exIdx, picker.setIdx, picker.field, val)}
+          onClose={() => setPicker(null)}
         />
       )}
     </div>
