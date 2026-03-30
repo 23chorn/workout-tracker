@@ -1,9 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-function isNotifyEnabled(): boolean {
-  return localStorage.getItem('lift-timer-notify') === '1' && 'Notification' in window && Notification.permission === 'granted';
-}
-
 export function useRestTimer() {
   const [endTime, setEndTime] = useState<number | null>(null);
   const [total, setTotal] = useState(0);
@@ -41,23 +37,11 @@ export function useRestTimer() {
       setRemaining(left);
       if (left <= 0 && !hasAlertedRef.current) {
         hasAlertedRef.current = true;
-        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
         // Screen flash overlay
         const overlay = document.createElement('div');
         overlay.className = 'timer-flash-overlay';
         document.body.appendChild(overlay);
         overlay.addEventListener('animationend', () => overlay.remove(), { once: true });
-        if (isNotifyEnabled()) {
-          try {
-            new Notification('LIFT — Rest Complete', {
-              body: 'Time for your next set',
-              icon: '/icon-192.png',
-              tag: 'rest-timer',
-            });
-          } catch {
-            // Notification may fail in some contexts
-          }
-        }
       }
     };
 

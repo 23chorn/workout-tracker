@@ -7,7 +7,7 @@ export function CalendarView({ sessions, sessionsByDate, rowingByDate, onSelectD
   sessions: Session[];
   sessionsByDate: Map<string, Session[]>;
   rowingByDate: Map<string, RowingSession[]>;
-  onSelectDate: (sessions: Session[]) => void;
+  onSelectDate: (dateKey: string) => void;
 }) {
   const [viewDate, setViewDate] = useState(() => new Date());
 
@@ -64,7 +64,7 @@ export function CalendarView({ sessions, sessionsByDate, rowingByDate, onSelectD
           else if (hasRowing) bg = 'var(--green)';
 
           return (
-            <button key={i} onClick={() => hasAny && daySessions && onSelectDate(daySessions)} style={{
+            <button key={i} onClick={() => hasAny && onSelectDate(dateKey)} style={{
               aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               borderRadius: 8, fontSize: 14, fontWeight: isToday ? 700 : 400,
               color: hasAny ? 'var(--text)' : 'var(--text-muted)', background: bg,

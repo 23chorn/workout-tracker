@@ -51,20 +51,6 @@ function HelpSection({ demo, demoLoading, onToggleDemo, onRowingToggle }: {
   onRowingToggle?: () => void;
 }) {
   const [rowingEnabled, setRowingEnabled] = useState(localStorage.getItem('lift-rowing-enabled') === '1');
-  const [timerNotify, setTimerNotify] = useState(localStorage.getItem('lift-timer-notify') === '1');
-
-  const toggleTimerNotify = async () => {
-    if (!timerNotify) {
-      if (!('Notification' in window)) { return; }
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') { return; }
-      localStorage.setItem('lift-timer-notify', '1');
-      setTimerNotify(true);
-    } else {
-      localStorage.removeItem('lift-timer-notify');
-      setTimerNotify(false);
-    }
-  };
 
   const toggleRowing = () => {
     const next = !rowingEnabled;
@@ -141,23 +127,6 @@ function HelpSection({ demo, demoLoading, onToggleDemo, onRowingToggle }: {
       <div className="card">
         <p style={{ fontSize: 13, lineHeight: 1.6 }}>All data is stored locally on your device in the browser. Nothing is sent to a server. Use the export/import buttons at the top of this screen to back up your data as a JSON file.</p>
       </div>
-
-      {'Notification' in window && (
-        <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
-          <h2 style={{ fontSize: 16 }}>Notifications</h2>
-          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Rest Timer Alert</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {timerNotify ? 'Notification when rest timer expires' : 'Get notified when rest is over'}
-              </div>
-            </div>
-            <button onClick={toggleTimerNotify} style={{ width: 48, height: 28, borderRadius: 14, padding: 2, cursor: 'pointer', background: timerNotify ? 'var(--accent)' : 'var(--border)', border: 'none', transition: 'background 0.2s', position: 'relative' }}>
-              <div style={{ width: 24, height: 24, borderRadius: 12, background: 'white', transition: 'transform 0.2s', transform: timerNotify ? 'translateX(20px)' : 'translateX(0)' }} />
-            </button>
-          </div>
-        </div>
-      )}
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
         <h2 style={{ fontSize: 16 }}>Modules</h2>

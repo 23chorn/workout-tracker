@@ -6,7 +6,7 @@ import { isRowingEnabled } from '../App';
 import { CalendarView } from '../components/history/CalendarView';
 import { SessionDetail } from '../components/history/SessionDetail';
 import { RowingSessionDetail } from '../components/history/RowingSessionDetail';
-import { ChevronRight, Calendar, List, Dumbbell, Waves } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, List, Dumbbell, Waves } from 'lucide-react';
 
 type FilterType = 'all' | 'lift' | 'rowing';
 type ListItem =
@@ -24,6 +24,7 @@ export function HistoryScreen() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedDaySessions, setSelectedDaySessions] = useState<Session[] | null>(null);
   const [selectedRowingSession, setSelectedRowingSession] = useState<RowingSession | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const showRowing = isRowingEnabled();
 
   const exMap = new Map(allExercises.map(e => [e.id!, e]));
@@ -54,6 +55,54 @@ export function HistoryScreen() {
     items.sort((a, b) => b.date.getTime() - a.date.getTime());
     return items;
   }, [sessions, rowingSessions, filter, showRowing]);
+
+  // Day picker: show options when a calendar date has both lift and rowing
+  const selectedDateLift = selectedDateKey ? sessionsByDate.get(selectedDateKey) ?? [] : [];
+  const selectedDateRowing = selectedDateKey ? rowingByDate.get(selectedDateKey) ?? [] : [];
+
+  if (selectedDateKey && (selectedDateLift.length > 0 || selectedDateRowing.length > 0)) {
+    // If only one type, go straight to it
+    if (selectedDateLift.length > 0 && selectedDateRowing.length === 0) {
+      return <SessionDetail sessions={selectedDateLift} allSessions={sessions} exMap={exMap} allTimeBest={allTimeBest} onBack={() => setSelectedDateKey(null)} />;
+    }
+    if (selectedDateRowing.length > 0 && selectedDateLift.length === 0) {
+      return <RowingSessionDetail session={selectedDateRowing[0]} onBack={() => setSelectedDateKey(null)} />;
+    }
+    // Both types — show picker
+    return (
+      <div className="screen">
+        <button className="btn btn-sm btn-secondary mb-md" onClick={() => setSelectedDateKey(null)}>
+          <ChevronLeft size={16} /> Back
+        </button>
+        <h1>{new Date(selectedDateKey).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>Two session types on this day</p>
+
+        {selectedDateLift.map((s, i) => (
+          <button key={`lift-${i}`} className="card" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', marginBottom: 8 }} onClick={() => { setSelectedDaySessions(selectedDateLift); setSelectedDateKey(null); }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 6, height: 32, borderRadius: 3, background: 'var(--accent)', flexShrink: 0 }} />
+              <div>
+                <div className="title"><Dumbbell size={13} style={{ marginRight: 4, verticalAlign: -2 }} />{s.dayLabel}</div>
+                <div className="subtitle">{wkMap.get(s.workoutId)?.name}{s.durationMinutes != null && ` · ${s.durationMinutes}m`}</div>
+              </div>
+            </div>
+          </button>
+        ))}
+
+        {selectedDateRowing.map((rs, i) => (
+          <button key={`row-${i}`} className="card" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', marginBottom: 8 }} onClick={() => { setSelectedRowingSession(rs); setSelectedDateKey(null); }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 6, height: 32, borderRadius: 3, background: 'var(--green)', flexShrink: 0 }} />
+              <div>
+                <div className="title"><Waves size={13} style={{ marginRight: 4, verticalAlign: -2 }} />{rs.type === 'steady' ? 'Steady State' : rs.type === 'distance' ? 'Distance' : 'Intervals'}</div>
+                <div className="subtitle">{rs.totalDistance && `${rs.totalDistance}m`}{rs.avgSplit && ` · ${formatSplit(rs.avgSplit)}/500m`}</div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   if (selectedDaySessions) {
     return <SessionDetail sessions={selectedDaySessions} allSessions={sessions} exMap={exMap} allTimeBest={allTimeBest} onBack={() => setSelectedDaySessions(null)} />;
@@ -93,7 +142,7 @@ export function HistoryScreen() {
       {totalSessions === 0 ? (
         <div className="empty"><p>No sessions recorded yet. Start a workout in the Today tab.</p></div>
       ) : view === 'calendar' ? (
-        <CalendarView sessions={sessions} sessionsByDate={sessionsByDate} rowingByDate={showRowing ? rowingByDate : new Map()} onSelectDate={setSelectedDaySessions} />
+        <CalendarView sessions={sessions} sessionsByDate={sessionsByDate} rowingByDate={showRowing ? rowingByDate : new Map()} onSelectDate={setSelectedDateKey} />
       ) : (
         combinedList.map((item) => {
           if (item.kind === 'lift') {
