@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SessionSet } from '../db/database';
 import { calcE10RM } from '../utils/e10rm';
-import { ChevronLeft, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Pencil } from 'lucide-react';
 
 type TimePeriod = '3m' | '6m' | '1y' | 'all';
 const PERIOD_LABELS: Record<TimePeriod, string> = { '3m': '3M', '6m': '6M', '1y': '1Y', 'all': 'All' };
@@ -16,10 +16,11 @@ function periodCutoff(period: TimePeriod): Date | null {
   return d;
 }
 
-export function ExerciseDetail({ exerciseId, backLabel, onBack, children }: {
+export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children }: {
   exerciseId: number;
   backLabel: string;
   onBack: () => void;
+  onEdit?: () => void;
   children?: React.ReactNode;
 }) {
   const sessions = useLiveQuery(() => db.sessions.orderBy('date').reverse().toArray()) ?? [];
@@ -90,9 +91,17 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, children }: {
         <ChevronLeft size={16} /> {backLabel}
       </button>
 
-      <h2 style={{ marginBottom: 4 }}>{exercise.name}</h2>
+      <div className="row-between" style={{ marginBottom: 4 }}>
+        <h2 style={{ marginBottom: 0 }}>{exercise.name}</h2>
+        {onEdit && (
+          <button className="btn btn-sm" style={{ padding: 4, minHeight: 0, color: 'var(--text-muted)' }} onClick={onEdit}>
+            <Pencil size={16} />
+          </button>
+        )}
+      </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-        {exercise.muscleGroup} &middot; Rest: {exercise.defaultRestSeconds}s
+        {exercise.category && <span style={{ textTransform: 'capitalize' }}>{exercise.category} &middot; </span>}
+        {exercise.muscleGroup}{exercise.secondaryMuscleGroup && ` / ${exercise.secondaryMuscleGroup}`} &middot; {exercise.defaultRestSeconds}s
         {bestE10RM > 0 && (
           <> &middot; PB: <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>{bestE10RM.toFixed(1)} kg</span></>
         )}

@@ -13,6 +13,7 @@ export function WorkoutManager() {
   const [wExercises, setWExercises] = useState<WorkoutExercise[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const startNew = () => { setName(''); setWExercises([]); setEditing({ name: '', exercises: [] }); };
   const startEdit = (w: Workout) => { setName(w.name); setWExercises([...w.exercises]); setEditing(w); };
@@ -62,7 +63,7 @@ export function WorkoutManager() {
       <div>
         <div className="row-between mb-md">
           <h2 style={{ marginBottom: 0 }}>{editing.id ? 'Edit' : 'New'} Workout</h2>
-          <button className="btn btn-sm btn-secondary" onClick={() => setEditing(null)}><X size={16} /> Cancel</button>
+          <button className="btn btn-sm btn-secondary" onClick={() => setShowCancelConfirm(true)}><X size={16} /> Cancel</button>
         </div>
         <div className="form-group">
           <label>Workout Name</label>
@@ -98,6 +99,9 @@ export function WorkoutManager() {
           );
         })}
         <button className="btn btn-primary btn-full mt-md" onClick={save}>Save Workout</button>
+        {showCancelConfirm && (
+          <ConfirmDialog title="Discard Changes" message="You have unsaved changes. Discard them?" confirmLabel="Discard" destructive onConfirm={() => { setShowCancelConfirm(false); setEditing(null); }} onCancel={() => setShowCancelConfirm(false)} />
+        )}
       </div>
     );
   }

@@ -1,12 +1,21 @@
 import Dexie, { type EntityTable } from 'dexie';
 
+export type ExerciseCategory = 'barbell' | 'dumbbell' | 'machine' | 'bodyweight';
+
 export interface Exercise {
   id?: number;
   name: string;
   muscleGroup: string;
   secondaryMuscleGroup?: string;
+  category?: ExerciseCategory;
   defaultRestSeconds: number;
   imageUrl?: string;
+}
+
+export interface BodyWeightEntry {
+  id?: number;
+  date: string;
+  weight: number;
 }
 
 export interface WorkoutExercise {
@@ -139,6 +148,7 @@ type LiftDB = Dexie & {
   rowingPrograms: EntityTable<RowingProgram, 'id'>;
   rowingProgress: EntityTable<RowingProgress, 'id'>;
   rowingSessions: EntityTable<RowingSession, 'id'>;
+  bodyWeight: EntityTable<BodyWeightEntry, 'id'>;
 };
 
 function createDB(name: string): LiftDB {
@@ -172,6 +182,17 @@ function createDB(name: string): LiftDB {
     rowingPrograms: '++id, name',
     rowingProgress: '++id, currentProgramId',
     rowingSessions: '++id, date, type, programId',
+  });
+  d.version(5).stores({
+    exercises: '++id, name, muscleGroup',
+    workouts: '++id, name',
+    programs: '++id, name',
+    sessions: '++id, date, programId, workoutId',
+    activeSession: '++id',
+    rowingPrograms: '++id, name',
+    rowingProgress: '++id, currentProgramId',
+    rowingSessions: '++id, date, type, programId',
+    bodyWeight: '++id, date',
   });
   return d;
 }

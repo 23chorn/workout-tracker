@@ -9,7 +9,7 @@ import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucid
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
-import { ScrollPicker, weightValues, repValues } from '../components/ScrollPicker';
+import { ScrollPicker, weightValues, dumbbellWeightValues, repValues } from '../components/ScrollPicker';
 
 interface ExerciseState {
   exerciseId: number;
@@ -43,6 +43,7 @@ export function TodayScreen() {
   const [picker, setPicker] = useState<{ exIdx: number; setIdx: number; field: 'weight' | 'reps' } | null>(null);
 
   const WEIGHTS = weightValues();
+  const DB_WEIGHTS = dumbbellWeightValues();
   const REPS = repValues();
   const [summary, setSummary] = useState<SessionSummaryData | null>(null);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
@@ -935,7 +936,9 @@ export function TodayScreen() {
       {picker && (
         <ScrollPicker
           label={picker.field === 'weight' ? 'Weight (kg)' : 'Reps'}
-          values={picker.field === 'weight' ? WEIGHTS : REPS}
+          values={picker.field === 'weight'
+            ? (exercises.get(exerciseStates[picker.exIdx]?.exerciseId)?.category === 'dumbbell' ? DB_WEIGHTS : WEIGHTS)
+            : REPS}
           value={(() => {
             const es = exerciseStates[picker.exIdx];
             const set = es?.sets[picker.setIdx];

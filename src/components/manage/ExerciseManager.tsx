@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/database';
+import { db, type ExerciseCategory } from '../../db/database';
 import { ExerciseDetail } from '../ExerciseDetail';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { OptionPicker } from '../OptionPicker';
 import { Plus, Trash2, Camera, Dumbbell } from 'lucide-react';
 import { MuscleGroupChips } from '../MuscleGroupChips';
 
@@ -36,7 +37,9 @@ export function ExerciseManager() {
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState('');
   const [secondaryMuscleGroup, setSecondaryMuscleGroup] = useState('');
+  const [addCategory, setAddCategory] = useState<ExerciseCategory | ''>('');
   const [rest, setRest] = useState('90');
+  const [addPicker, setAddPicker] = useState<'muscle' | 'secondary' | 'category' | null>(null);
   const [viewingExercise, setViewingExercise] = useState<number | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef(0);
@@ -59,11 +62,12 @@ export function ExerciseManager() {
     if (!name.trim()) return;
     await db.exercises.add({
       name: name.trim(),
-      muscleGroup: muscleGroup.trim(),
-      secondaryMuscleGroup: secondaryMuscleGroup.trim() || undefined,
+      muscleGroup: muscleGroup,
+      secondaryMuscleGroup: secondaryMuscleGroup || undefined,
+      category: addCategory || undefined,
       defaultRestSeconds: parseInt(rest) || 90,
     });
-    setName(''); setMuscleGroup(''); setSecondaryMuscleGroup(''); setRest('90'); setShowAdd(false);
+    setName(''); setMuscleGroup(''); setSecondaryMuscleGroup(''); setAddCategory(''); setRest('90'); setShowAdd(false);
   };
 
   const handlePhoto = async (exId: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +107,12 @@ export function ExerciseManager() {
   const [editName, setEditName] = useState('');
   const [editMuscle, setEditMuscle] = useState('');
   const [editSecondary, setEditSecondary] = useState('');
+  const [editCategory, setEditCategory] = useState<ExerciseCategory | ''>('');
   const [editRest, setEditRest] = useState('');
+  const [editPicker, setEditPicker] = useState<'muscle' | 'secondary' | 'category' | null>(null);
+
+  const ALL_MUSCLES = [...new Set(exercises.flatMap(e => [e.muscleGroup, ...(e.secondaryMuscleGroup ? [e.secondaryMuscleGroup] : [])]))].sort();
+  const CATEGORIES: ExerciseCategory[] = ['barbell', 'dumbbell', 'machine', 'bodyweight'];
 
   const deleteExercise = async (id: number) => {
     await db.exercises.delete(id);
@@ -118,16 +127,18 @@ export function ExerciseManager() {
     setEditName(viewing.name);
     setEditMuscle(viewing.muscleGroup);
     setEditSecondary(viewing.secondaryMuscleGroup ?? '');
+    setEditCategory(viewing.category ?? '');
     setEditRest(String(viewing.defaultRestSeconds));
     setEditingFields(true);
   };
 
   const saveEditing = async () => {
-    if (!viewing || !editName.trim()) return;
+    if (!viewing || !editName.trim() || !editMuscle) return;
     await db.exercises.update(viewing.id!, {
       name: editName.trim(),
-      muscleGroup: editMuscle.trim(),
-      secondaryMuscleGroup: editSecondary.trim() || undefined,
+      muscleGroup: editMuscle,
+      secondaryMuscleGroup: editSecondary || undefined,
+      category: editCategory || undefined,
       defaultRestSeconds: parseInt(editRest) || 90,
     });
     setEditingFields(false);
@@ -140,20 +151,31 @@ export function ExerciseManager() {
           exerciseId={viewing.id!}
           backLabel="Exercises"
           onBack={() => { closeExercise(); setEditingFields(false); }}
+          onEdit={startEditing}
         >
-          {editingFields ? (
+          {editingFields && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="form-group">
                 <label>Name</label>
                 <input value={editName} onChange={e => setEditName(e.target.value)} />
               </div>
               <div className="form-group">
+                <label>Category</label>
+                <button className="picker-input" onClick={() => setEditPicker('category')}>
+                  {editCategory ? <span style={{ textTransform: 'capitalize' }}>{editCategory}</span> : <span className="placeholder">Select...</span>}
+                </button>
+              </div>
+              <div className="form-group">
                 <label>Primary Muscle Group</label>
-                <input value={editMuscle} onChange={e => setEditMuscle(e.target.value)} />
+                <button className="picker-input" onClick={() => setEditPicker('muscle')}>
+                  {editMuscle || <span className="placeholder">Select...</span>}
+                </button>
               </div>
               <div className="form-group">
                 <label>Secondary Muscle Group</label>
-                <input value={editSecondary} onChange={e => setEditSecondary(e.target.value)} placeholder="Optional" />
+                <button className="picker-input" onClick={() => setEditPicker('secondary')}>
+                  {editSecondary || <span className="placeholder">None</span>}
+                </button>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label>Default Rest (seconds)</label>
@@ -163,11 +185,17 @@ export function ExerciseManager() {
                 <button className="btn btn-secondary" onClick={() => setEditingFields(false)}>Cancel</button>
                 <button className="btn btn-primary" onClick={saveEditing}>Save</button>
               </div>
+
+              {editPicker === 'category' && (
+                <OptionPicker title="Category" options={CATEGORIES.map(c => c.charAt(0).toUpperCase() + c.slice(1))} value={editCategory ? editCategory.charAt(0).toUpperCase() + editCategory.slice(1) : ''} allowEmpty onChange={v => setEditCategory((v.toLowerCase() as ExerciseCategory) || '')} onClose={() => setEditPicker(null)} />
+              )}
+              {editPicker === 'muscle' && (
+                <OptionPicker title="Primary Muscle Group" options={ALL_MUSCLES} value={editMuscle} onChange={v => setEditMuscle(v)} onClose={() => setEditPicker(null)} />
+              )}
+              {editPicker === 'secondary' && (
+                <OptionPicker title="Secondary Muscle Group" options={ALL_MUSCLES} value={editSecondary} allowEmpty onChange={v => setEditSecondary(v)} onClose={() => setEditPicker(null)} />
+              )}
             </div>
-          ) : (
-            <button className="btn btn-secondary btn-full mb-md" onClick={startEditing}>
-              Edit Details
-            </button>
           )}
 
           {viewing.imageUrl ? (
@@ -217,13 +245,38 @@ export function ExerciseManager() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>Add Exercise</h2>
             <div className="form-group"><label>Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Barbell Row" /></div>
-            <div className="form-group"><label>Primary Muscle Group</label><input value={muscleGroup} onChange={e => setMuscleGroup(e.target.value)} placeholder="e.g. Back" /></div>
-            <div className="form-group"><label>Secondary Muscle Group (optional)</label><input value={secondaryMuscleGroup} onChange={e => setSecondaryMuscleGroup(e.target.value)} placeholder="e.g. Biceps" /></div>
+            <div className="form-group">
+              <label>Category</label>
+              <button className="picker-input" onClick={() => setAddPicker('category')}>
+                {addCategory ? <span style={{ textTransform: 'capitalize' }}>{addCategory}</span> : <span className="placeholder">Select...</span>}
+              </button>
+            </div>
+            <div className="form-group">
+              <label>Primary Muscle Group</label>
+              <button className="picker-input" onClick={() => setAddPicker('muscle')}>
+                {muscleGroup || <span className="placeholder">Select...</span>}
+              </button>
+            </div>
+            <div className="form-group">
+              <label>Secondary Muscle Group</label>
+              <button className="picker-input" onClick={() => setAddPicker('secondary')}>
+                {secondaryMuscleGroup || <span className="placeholder">None</span>}
+              </button>
+            </div>
             <div className="form-group"><label>Default Rest (seconds)</label><input type="number" value={rest} onChange={e => setRest(e.target.value)} /></div>
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={addExercise}>Add</button>
             </div>
+            {addPicker === 'category' && (
+              <OptionPicker title="Category" options={CATEGORIES.map(c => c.charAt(0).toUpperCase() + c.slice(1))} value={addCategory ? addCategory.charAt(0).toUpperCase() + addCategory.slice(1) : ''} allowEmpty onChange={v => setAddCategory((v.toLowerCase() as ExerciseCategory) || '')} onClose={() => setAddPicker(null)} />
+            )}
+            {addPicker === 'muscle' && (
+              <OptionPicker title="Primary Muscle Group" options={ALL_MUSCLES} value={muscleGroup} onChange={v => setMuscleGroup(v)} onClose={() => setAddPicker(null)} />
+            )}
+            {addPicker === 'secondary' && (
+              <OptionPicker title="Secondary Muscle Group" options={ALL_MUSCLES} value={secondaryMuscleGroup} allowEmpty onChange={v => setSecondaryMuscleGroup(v)} onClose={() => setAddPicker(null)} />
+            )}
           </div>
         </div>
       )}
@@ -242,7 +295,7 @@ export function ExerciseManager() {
               )}
               <div style={{ textAlign: 'left' }}>
                 <div className="title">{ex.name}</div>
-                <div className="subtitle">{ex.muscleGroup}{ex.secondaryMuscleGroup && ` / ${ex.secondaryMuscleGroup}`} &middot; {ex.defaultRestSeconds}s</div>
+                <div className="subtitle">{ex.category && <span style={{ textTransform: 'capitalize' }}>{ex.category} &middot; </span>}{ex.muscleGroup}{ex.secondaryMuscleGroup && ` / ${ex.secondaryMuscleGroup}`} &middot; {ex.defaultRestSeconds}s</div>
               </div>
             </button>
           ))}

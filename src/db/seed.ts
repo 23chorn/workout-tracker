@@ -1,102 +1,123 @@
-import { db, type Exercise } from './database';
+import { db, type Exercise, type ExerciseCategory } from './database';
 
 const COMPOUND_REST = 180;
 const ISOLATION_REST = 90;
 
-const seedExercises: Omit<Exercise, 'id'>[] = [
-  // Upper body — free weights
-  { name: 'Bench Press', muscleGroup: 'Chest', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Incline Bench Press', muscleGroup: 'Chest', secondaryMuscleGroup: 'Shoulders', defaultRestSeconds: COMPOUND_REST },
-  { name: 'OHP', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Bent Over Row', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Barbell Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Close Grip Bench Press', muscleGroup: 'Triceps', secondaryMuscleGroup: 'Chest', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dumbbell Shoulder Press', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dumbbell Lateral Raise', muscleGroup: 'Shoulders', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Dumbbell Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Skull Crushers', muscleGroup: 'Triceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Tricep Overhead Extension', muscleGroup: 'Triceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Dumbbell Bench Press', muscleGroup: 'Chest', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dumbbell Incline Press', muscleGroup: 'Chest', secondaryMuscleGroup: 'Shoulders', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dumbbell Row', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Hammer Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Preacher Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Concentration Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Arnold Press', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dumbbell Rear Delt Fly', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Back', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Dumbbell Pullover', muscleGroup: 'Chest', secondaryMuscleGroup: 'Back', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Barbell Shrug', muscleGroup: 'Traps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Upright Row', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Traps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dips', muscleGroup: 'Triceps', secondaryMuscleGroup: 'Chest', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Chest Dips', muscleGroup: 'Chest', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  // Upper body — bodyweight / assisted
-  { name: 'Pull Up', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Chin Up', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Assisted Pull Up', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Assisted Dip', muscleGroup: 'Triceps', secondaryMuscleGroup: 'Chest', defaultRestSeconds: COMPOUND_REST },
-  // Upper body — machines/cables
-  { name: 'Lat Pulldown', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Seated Cable Row', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Cable Fly', muscleGroup: 'Chest', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Tricep Pushdown', muscleGroup: 'Triceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Face Pull', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Back', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Pec Deck', muscleGroup: 'Chest', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Chest Supported Row', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Machine Chest Press', muscleGroup: 'Chest', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Machine Shoulder Press', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Triceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Cable Lateral Raise', muscleGroup: 'Shoulders', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Cable Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Cable Overhead Tricep Extension', muscleGroup: 'Triceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Reverse Pec Deck', muscleGroup: 'Shoulders', secondaryMuscleGroup: 'Back', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Machine Bicep Curl', muscleGroup: 'Biceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Machine Tricep Extension', muscleGroup: 'Triceps', defaultRestSeconds: ISOLATION_REST },
-  { name: 'T-Bar Row', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Pendlay Row', muscleGroup: 'Back', secondaryMuscleGroup: 'Biceps', defaultRestSeconds: COMPOUND_REST },
-  // Lower body — free weights
-  { name: 'Squat', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Romanian Deadlift', muscleGroup: 'Hamstrings', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Deadlift', muscleGroup: 'Back', secondaryMuscleGroup: 'Hamstrings', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Bulgarian Split Squat', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Barbell Hip Thrust', muscleGroup: 'Glutes', secondaryMuscleGroup: 'Hamstrings', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Dumbbell Lunge', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Front Squat', muscleGroup: 'Quads', secondaryMuscleGroup: 'Core', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Sumo Deadlift', muscleGroup: 'Hamstrings', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Goblet Squat', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  // Lower body — machines
-  { name: 'Leg Press', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Leg Curl', muscleGroup: 'Hamstrings', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Leg Extension', muscleGroup: 'Quads', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Seated Calf Raise', muscleGroup: 'Calves', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Standing Calf Raise', muscleGroup: 'Calves', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Hack Squat', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  { name: 'Hip Adductor', muscleGroup: 'Adductors', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Hip Abductor', muscleGroup: 'Abductors', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Glute Kickback Machine', muscleGroup: 'Glutes', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Smith Machine Squat', muscleGroup: 'Quads', secondaryMuscleGroup: 'Glutes', defaultRestSeconds: COMPOUND_REST },
-  // Core
-  { name: 'Cable Crunch', muscleGroup: 'Core', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Hanging Leg Raise', muscleGroup: 'Core', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Ab Wheel Rollout', muscleGroup: 'Core', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Decline Sit Up', muscleGroup: 'Core', defaultRestSeconds: ISOLATION_REST },
-  { name: 'Russian Twist', muscleGroup: 'Core', defaultRestSeconds: ISOLATION_REST },
+type Seed = Omit<Exercise, 'id'>;
+
+function ex(name: string, muscleGroup: string, category: ExerciseCategory, rest: number, secondary?: string): Seed {
+  return { name, muscleGroup, secondaryMuscleGroup: secondary, category, defaultRestSeconds: rest };
+}
+
+const B = 'barbell' as const;
+const D = 'dumbbell' as const;
+const M = 'machine' as const;
+const BW = 'bodyweight' as const;
+const C = COMPOUND_REST;
+const I = ISOLATION_REST;
+
+const seedExercises: Seed[] = [
+  // Barbell — upper
+  ex('Bench Press', 'Chest', B, C, 'Triceps'),
+  ex('Incline Bench Press', 'Chest', B, C, 'Shoulders'),
+  ex('OHP', 'Shoulders', B, C, 'Triceps'),
+  ex('Bent Over Row', 'Back', B, C, 'Biceps'),
+  ex('Barbell Curl', 'Biceps', B, I),
+  ex('Close Grip Bench Press', 'Triceps', B, C, 'Chest'),
+  ex('Skull Crushers', 'Triceps', B, I),
+  ex('Preacher Curl', 'Biceps', B, I),
+  ex('Barbell Shrug', 'Traps', B, I),
+  ex('Upright Row', 'Shoulders', B, C, 'Traps'),
+  ex('Pendlay Row', 'Back', B, C, 'Biceps'),
+  // Barbell — lower
+  ex('Squat', 'Quads', B, C, 'Glutes'),
+  ex('Deadlift', 'Back', B, C, 'Hamstrings'),
+  ex('Romanian Deadlift', 'Hamstrings', B, C, 'Glutes'),
+  ex('Front Squat', 'Quads', B, C, 'Core'),
+  ex('Sumo Deadlift', 'Hamstrings', B, C, 'Glutes'),
+  ex('Barbell Hip Thrust', 'Glutes', B, C, 'Hamstrings'),
+
+  // Dumbbell — upper
+  ex('Dumbbell Shoulder Press', 'Shoulders', D, C, 'Triceps'),
+  ex('Dumbbell Lateral Raise', 'Shoulders', D, I),
+  ex('Dumbbell Curl', 'Biceps', D, I),
+  ex('Tricep Overhead Extension', 'Triceps', D, I),
+  ex('Dumbbell Bench Press', 'Chest', D, C, 'Triceps'),
+  ex('Dumbbell Incline Press', 'Chest', D, C, 'Shoulders'),
+  ex('Dumbbell Row', 'Back', D, C, 'Biceps'),
+  ex('Hammer Curl', 'Biceps', D, I),
+  ex('Concentration Curl', 'Biceps', D, I),
+  ex('Arnold Press', 'Shoulders', D, C, 'Triceps'),
+  ex('Dumbbell Rear Delt Fly', 'Shoulders', D, I, 'Back'),
+  ex('Dumbbell Pullover', 'Chest', D, I, 'Back'),
+  // Dumbbell — lower
+  ex('Bulgarian Split Squat', 'Quads', D, C, 'Glutes'),
+  ex('Dumbbell Lunge', 'Quads', D, C, 'Glutes'),
+  ex('Goblet Squat', 'Quads', D, C, 'Glutes'),
+
+  // Machine / Cable — upper
+  ex('Lat Pulldown', 'Back', M, C, 'Biceps'),
+  ex('Seated Cable Row', 'Back', M, C, 'Biceps'),
+  ex('Cable Fly', 'Chest', M, I),
+  ex('Tricep Pushdown', 'Triceps', M, I),
+  ex('Face Pull', 'Shoulders', M, I, 'Back'),
+  ex('Pec Deck', 'Chest', M, I),
+  ex('Chest Supported Row', 'Back', M, C, 'Biceps'),
+  ex('Machine Chest Press', 'Chest', M, C, 'Triceps'),
+  ex('Machine Shoulder Press', 'Shoulders', M, C, 'Triceps'),
+  ex('Cable Lateral Raise', 'Shoulders', M, I),
+  ex('Cable Curl', 'Biceps', M, I),
+  ex('Cable Overhead Tricep Extension', 'Triceps', M, I),
+  ex('Reverse Pec Deck', 'Shoulders', M, I, 'Back'),
+  ex('Machine Bicep Curl', 'Biceps', M, I),
+  ex('Machine Tricep Extension', 'Triceps', M, I),
+  ex('T-Bar Row', 'Back', M, C, 'Biceps'),
+  // Machine / Cable — lower
+  ex('Leg Press', 'Quads', M, C, 'Glutes'),
+  ex('Leg Curl', 'Hamstrings', M, I),
+  ex('Leg Extension', 'Quads', M, I),
+  ex('Seated Calf Raise', 'Calves', M, I),
+  ex('Standing Calf Raise', 'Calves', M, I),
+  ex('Hack Squat', 'Quads', M, C, 'Glutes'),
+  ex('Hip Adductor', 'Adductors', M, I),
+  ex('Hip Abductor', 'Abductors', M, I),
+  ex('Glute Kickback Machine', 'Glutes', M, I),
+  ex('Smith Machine Squat', 'Quads', M, C, 'Glutes'),
+  // Machine — core
+  ex('Cable Crunch', 'Core', M, I),
+
+  // Bodyweight
+  ex('Pull Up', 'Back', BW, C, 'Biceps'),
+  ex('Chin Up', 'Back', BW, C, 'Biceps'),
+  ex('Assisted Pull Up', 'Back', BW, C, 'Biceps'),
+  ex('Assisted Dip', 'Triceps', BW, C, 'Chest'),
+  ex('Dips', 'Triceps', BW, C, 'Chest'),
+  ex('Chest Dips', 'Chest', BW, C, 'Triceps'),
+  ex('Push Up', 'Chest', BW, I, 'Triceps'),
+  ex('Hanging Leg Raise', 'Core', BW, I),
+  ex('Ab Wheel Rollout', 'Core', BW, I),
+  ex('Decline Sit Up', 'Core', BW, I),
+  ex('Russian Twist', 'Core', BW, I),
 ];
 
 export async function seedDatabase() {
   const existing = await db.exercises.toArray();
   const existingNames = new Set(existing.map(e => e.name));
 
-  // Add new seed exercises
   const toAdd = seedExercises.filter(e => !existingNames.has(e.name));
   if (toAdd.length > 0) {
     await db.exercises.bulkAdd(toAdd);
   }
 
-  // Backfill secondary muscle groups on existing seed exercises that are missing them
+  // Backfill category and secondary muscle groups on existing exercises
   for (const seed of seedExercises) {
-    if (!seed.secondaryMuscleGroup) continue;
-    const existing = await db.exercises.where('name').equals(seed.name).first();
-    if (existing && !existing.secondaryMuscleGroup) {
-      await db.exercises.update(existing.id!, { secondaryMuscleGroup: seed.secondaryMuscleGroup });
+    const ex = await db.exercises.where('name').equals(seed.name).first();
+    if (!ex) continue;
+    const updates: Partial<Exercise> = {};
+    if (!ex.category && seed.category) updates.category = seed.category;
+    if (!ex.secondaryMuscleGroup && seed.secondaryMuscleGroup) updates.secondaryMuscleGroup = seed.secondaryMuscleGroup;
+    if (Object.keys(updates).length > 0) {
+      await db.exercises.update(ex.id!, updates);
     }
   }
 }

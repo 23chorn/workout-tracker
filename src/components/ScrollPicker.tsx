@@ -123,6 +123,15 @@ export function weightValues(max = 200, step = 2.5): number[] {
   return vals;
 }
 
+export function dumbbellWeightValues(max = 100): number[] {
+  const vals: number[] = [0];
+  // Below 10kg: increments of 2 (2kg per dumbbell = 2kg total)
+  for (let w = 2; w < 10; w += 2) vals.push(w);
+  // 10kg and above: increments of 4 (2kg per arm × 2 arms)
+  for (let w = 10; w <= max; w += 4) vals.push(w);
+  return vals;
+}
+
 export function repValues(max = 30): number[] {
   return Array.from({ length: max }, (_, i) => i + 1);
 }

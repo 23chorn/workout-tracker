@@ -16,6 +16,8 @@ export function ProgramManager() {
     return stored ? Number(stored) : null;
   });
 
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
   const setAsDefault = (id: number) => { localStorage.setItem('lift-default-program', String(id)); setDefaultProgramId(id); };
   const startNew = () => { setName(''); setDays([]); setEditing({ name: '', days: [] }); };
   const startEdit = (p: Program) => { setName(p.name); setDays([...p.days]); setEditing(p); };
@@ -41,7 +43,7 @@ export function ProgramManager() {
       <div>
         <div className="row-between mb-md">
           <h2 style={{ marginBottom: 0 }}>{editing.id ? 'Edit' : 'New'} Program</h2>
-          <button className="btn btn-sm btn-secondary" onClick={() => setEditing(null)}><X size={16} /> Cancel</button>
+          <button className="btn btn-sm btn-secondary" onClick={() => setShowCancelConfirm(true)}><X size={16} /> Cancel</button>
         </div>
         <div className="form-group"><label>Program Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Push Pull Legs" /></div>
         {days.map((day, idx) => (
@@ -61,6 +63,9 @@ export function ProgramManager() {
         ))}
         <button className="btn btn-secondary btn-full mb-md" onClick={addDay}><Plus size={16} /> Add Day</button>
         <button className="btn btn-primary btn-full" onClick={save}>Save Program</button>
+        {showCancelConfirm && (
+          <ConfirmDialog title="Discard Changes" message="You have unsaved changes. Discard them?" confirmLabel="Discard" destructive onConfirm={() => { setShowCancelConfirm(false); setEditing(null); }} onCancel={() => setShowCancelConfirm(false)} />
+        )}
       </div>
     );
   }
