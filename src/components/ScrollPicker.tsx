@@ -14,12 +14,10 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedIdx, setSelectedIdx] = useState(() => {
-    // Find closest match — try exact, then numeric match
     let idx = values.findIndex(v => String(v) === value);
     if (idx < 0 && value) {
       const num = parseFloat(value);
       if (!isNaN(num)) {
-        // Find closest value
         let closest = 0;
         let closestDist = Infinity;
         for (let i = 0; i < values.length; i++) {
@@ -32,7 +30,6 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
     return Math.max(0, idx);
   });
 
-  // Scroll to initial position on mount
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -65,15 +62,12 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
         </div>
 
         <div style={{ position: 'relative', height: PICKER_HEIGHT, overflow: 'hidden' }}>
-          {/* Selection highlight */}
           <div style={{
             position: 'absolute', top: ITEM_HEIGHT * 2, left: 16, right: 16,
             height: ITEM_HEIGHT, background: 'transparent',
             borderRadius: 8, border: '2px solid var(--accent)',
             pointerEvents: 'none', zIndex: 1,
           }} />
-
-          {/* Fade edges */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: ITEM_HEIGHT * 2, background: 'linear-gradient(var(--bg-card), transparent)', pointerEvents: 'none', zIndex: 2 }} />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ITEM_HEIGHT * 2, background: 'linear-gradient(transparent, var(--bg-card))', pointerEvents: 'none', zIndex: 2 }} />
 
@@ -125,9 +119,7 @@ export function weightValues(max = 200, step = 2.5): number[] {
 
 export function dumbbellWeightValues(max = 100): number[] {
   const vals: number[] = [0];
-  // Below 10kg: increments of 2 (2kg per dumbbell = 2kg total)
   for (let w = 2; w < 10; w += 2) vals.push(w);
-  // 10kg and above: increments of 4 (2kg per arm × 2 arms)
   for (let w = 10; w <= max; w += 4) vals.push(w);
   return vals;
 }
