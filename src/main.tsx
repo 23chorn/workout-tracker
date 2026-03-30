@@ -16,9 +16,13 @@ async function init() {
 
 init();
 
+// Unregister any stale service workers and clear caches
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js');
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(r => r.unregister());
+  });
+  caches.keys().then(keys => {
+    keys.forEach(k => caches.delete(k));
   });
 }
 

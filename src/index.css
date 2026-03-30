@@ -50,10 +50,6 @@ input, select {
   padding: 10px 12px;
   outline: none;
   width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  -webkit-user-select: text;
-  user-select: text;
 }
 
 input:focus, select:focus {
