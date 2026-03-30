@@ -19,30 +19,30 @@ function drawIcon(size) {
 
   // Bar
   ctx.fillStyle = '#6366f1';
-  ctx.fillRect(60 * s, barY, 392 * s, barH);
+  ctx.fillRect(74 * s, barY, 364 * s, barH);
 
-  // Left plates (outer to inner)
-  // Outer plate
-  ctx.fillStyle = '#818cf8';
-  ctx.beginPath();
-  ctx.roundRect(80 * s, cy - 70 * s, 32 * s, 140 * s, 6 * s);
-  ctx.fill();
-  // Inner plate
+  // Left plates — inner (big) then outer (small)
+  // Inner plate (big, next to collar)
   ctx.fillStyle = '#6366f1';
   ctx.beginPath();
-  ctx.roundRect(118 * s, cy - 55 * s, 28 * s, 110 * s, 6 * s);
+  ctx.roundRect(108 * s, cy - 70 * s, 32 * s, 140 * s, 6 * s);
   ctx.fill();
-
-  // Right plates (outer to inner)
-  // Outer plate
+  // Outer plate (small, near end)
   ctx.fillStyle = '#818cf8';
   ctx.beginPath();
-  ctx.roundRect(400 * s, cy - 70 * s, 32 * s, 140 * s, 6 * s);
+  ctx.roundRect(74 * s, cy - 50 * s, 28 * s, 100 * s, 6 * s);
   ctx.fill();
-  // Inner plate
+
+  // Right plates — inner (big) then outer (small)
+  // Inner plate (big, next to collar)
   ctx.fillStyle = '#6366f1';
   ctx.beginPath();
-  ctx.roundRect(366 * s, cy - 55 * s, 28 * s, 110 * s, 6 * s);
+  ctx.roundRect(372 * s, cy - 70 * s, 32 * s, 140 * s, 6 * s);
+  ctx.fill();
+  // Outer plate (small, near end)
+  ctx.fillStyle = '#818cf8';
+  ctx.beginPath();
+  ctx.roundRect(410 * s, cy - 50 * s, 28 * s, 100 * s, 6 * s);
   ctx.fill();
 
   // Left collar
@@ -56,13 +56,13 @@ function drawIcon(size) {
   // Left end cap
   ctx.fillStyle = '#4f46e5';
   ctx.beginPath();
-  ctx.roundRect(52 * s, cy - 14 * s, 28 * s, 28 * s, 4 * s);
+  ctx.roundRect(44 * s, cy - 14 * s, 26 * s, 28 * s, 4 * s);
   ctx.fill();
 
   // Right end cap
   ctx.fillStyle = '#4f46e5';
   ctx.beginPath();
-  ctx.roundRect(432 * s, cy - 14 * s, 28 * s, 28 * s, 4 * s);
+  ctx.roundRect(442 * s, cy - 14 * s, 26 * s, 28 * s, 4 * s);
   ctx.fill();
 
   // "LIFT" text — draw with fill + stroke for bold effect since server fonts lack weights
