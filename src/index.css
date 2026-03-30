@@ -50,6 +50,10 @@ input, select {
   padding: 10px 12px;
   outline: none;
   width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 input:focus, select:focus {
@@ -470,8 +474,6 @@ select {
   justify-content: center;
   z-index: 200;
   padding: 16px;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
 }
 
 .modal {
@@ -484,13 +486,6 @@ select {
   overflow-y: auto;
   padding: 24px;
   -webkit-overflow-scrolling: touch;
-}
-
-.modal input,
-.modal select {
-  -webkit-user-select: text;
-  user-select: text;
-  touch-action: manipulation;
 }
 
 .modal h2 {
