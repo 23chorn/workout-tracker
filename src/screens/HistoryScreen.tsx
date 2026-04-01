@@ -6,7 +6,8 @@ import { isRowingEnabled } from '../App';
 import { CalendarView } from '../components/history/CalendarView';
 import { SessionDetail } from '../components/history/SessionDetail';
 import { RowingSessionDetail } from '../components/history/RowingSessionDetail';
-import { ChevronLeft, ChevronRight, Calendar, List, Dumbbell, Waves } from 'lucide-react';
+import { LogPastSession } from '../components/history/LogPastSession';
+import { ChevronLeft, ChevronRight, Calendar, List, Dumbbell, Waves, Plus } from 'lucide-react';
 
 type FilterType = 'all' | 'lift' | 'rowing';
 type ListItem =
@@ -25,6 +26,7 @@ export function HistoryScreen() {
   const [selectedDaySessions, setSelectedDaySessions] = useState<Session[] | null>(null);
   const [selectedRowingSession, setSelectedRowingSession] = useState<RowingSession | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const [showLogPast, setShowLogPast] = useState(false);
   const showRowing = isRowingEnabled();
 
   const exMap = new Map(allExercises.map(e => [e.id!, e]));
@@ -59,6 +61,10 @@ export function HistoryScreen() {
   // Day picker: show options when a calendar date has both lift and rowing
   const selectedDateLift = selectedDateKey ? sessionsByDate.get(selectedDateKey) ?? [] : [];
   const selectedDateRowing = selectedDateKey ? rowingByDate.get(selectedDateKey) ?? [] : [];
+
+  if (showLogPast) {
+    return <LogPastSession onBack={() => setShowLogPast(false)} onSaved={() => setShowLogPast(false)} />;
+  }
 
   if (selectedDateKey && (selectedDateLift.length > 0 || selectedDateRowing.length > 0)) {
     // If only one type, go straight to it
@@ -119,6 +125,7 @@ export function HistoryScreen() {
       <div className="row-between mb-md">
         <h1 style={{ marginBottom: 0 }}>History</h1>
         <div className="row gap-sm">
+          <button className="btn btn-sm btn-primary" onClick={() => setShowLogPast(true)}><Plus size={14} /></button>
           <button className={`btn btn-sm ${view === 'calendar' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('calendar')}><Calendar size={14} /></button>
           <button className={`btn btn-sm ${view === 'list' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('list')}><List size={14} /></button>
         </div>

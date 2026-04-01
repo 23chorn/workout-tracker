@@ -587,8 +587,20 @@ export function TodayScreen() {
       </div>
 
       {/* Sticky timer when inline is scrolled out of view */}
-      {timer.active && confirmedSets.size > 0 && !inlineTimerVisible && (
-        <div className="timer-bar" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+      {timer.active && confirmedSets.size > 0 && (
+        <div className="timer-bar" style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          opacity: inlineTimerVisible ? 0 : 1,
+          pointerEvents: inlineTimerVisible ? 'none' : 'auto',
+          maxHeight: inlineTimerVisible ? 0 : 200,
+          padding: inlineTimerVisible ? 0 : undefined,
+          marginBottom: inlineTimerVisible ? 0 : undefined,
+          borderWidth: inlineTimerVisible ? 0 : undefined,
+          overflow: 'hidden',
+          transition: 'opacity 0.15s ease',
+        }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
               {timer.expired ? 'Rest Over' : 'Rest Timer'}

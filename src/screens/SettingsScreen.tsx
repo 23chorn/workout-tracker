@@ -4,7 +4,8 @@ import { exportData, importData } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { BodyWeightTracker } from '../components/BodyWeightTracker';
-import { Download, Upload, X, FlaskConical, Trash2, Check } from 'lucide-react';
+import { Download, Upload, X, FlaskConical, Trash2, Check, FileUp } from 'lucide-react';
+import { importAlphaProgression } from '../utils/importAlpha';
 
 function DeleteAllButton() {
   const [showConfirm, setShowConfirm] = useState(false);
@@ -81,6 +82,8 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importSuccess, setImportSuccess] = useState<boolean | null>(null);
   const [rowingEnabled, setRowingEnabled] = useState(localStorage.getItem('lift-rowing-enabled') === '1');
+  const [alphaResult, setAlphaResult] = useState<{ sessionsAdded: number; exercisesAdded: string[] } | null>(null);
+  const [alphaLoading, setAlphaLoading] = useState(false);
 
   const toggleDemo = async () => {
     setDemoLoading(true);
@@ -124,7 +127,25 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
           </button>
           <input ref={fileRef} type="file" accept=".json" onChange={handleImportSelect} style={{ display: 'none' }} />
         </div>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>All data stored locally. Nothing sent to a server.</p>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>All data stored locally. Nothing sent to a server.</p>
+        <button
+          className="btn btn-sm btn-secondary btn-full"
+          disabled={alphaLoading}
+          onClick={async () => {
+            setAlphaLoading(true);
+            try {
+              const result = await importAlphaProgression();
+              setAlphaResult(result);
+            } catch (e) {
+              console.error(e);
+              setAlphaResult({ sessionsAdded: 0, exercisesAdded: [] });
+            }
+            setAlphaLoading(false);
+          }}
+        >
+          <FileUp size={14} /> {alphaLoading ? 'Importing...' : 'Import Alpha Progression History'}
+        </button>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Imports 18 sessions from Jan–Mar 2026. Skips dates already in history.</p>
       </div>
 
       {/* Help */}
@@ -180,6 +201,25 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
 
       {importFile && (
         <ConfirmDialog title="Import Data" message="This will overwrite all existing data. Are you sure?" confirmLabel="Import" destructive onConfirm={handleImportConfirm} onCancel={() => setImportFile(null)} />
+      )}
+
+      {alphaResult !== null && (
+        <div className="modal-overlay" onClick={() => setAlphaResult(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
+            <h2>{alphaResult.sessionsAdded > 0 ? 'Import Complete' : 'Nothing to Import'}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 8 }}>
+              {alphaResult.sessionsAdded > 0
+                ? `Added ${alphaResult.sessionsAdded} sessions.`
+                : 'All sessions already exist in history.'}
+            </p>
+            {alphaResult.exercisesAdded.length > 0 && (
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 8 }}>
+                New exercises added: {alphaResult.exercisesAdded.join(', ')}
+              </p>
+            )}
+            <button className="btn btn-primary btn-full" onClick={() => setAlphaResult(null)}>OK</button>
+          </div>
+        </div>
       )}
 
       {importSuccess !== null && (
