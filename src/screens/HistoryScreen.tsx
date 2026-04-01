@@ -125,7 +125,7 @@ export function HistoryScreen() {
       <div className="row-between mb-md">
         <h1 style={{ marginBottom: 0 }}>History</h1>
         <div className="row gap-sm">
-          <button className="btn btn-sm btn-primary" onClick={() => setShowLogPast(true)}><Plus size={14} /></button>
+          <button className="btn btn-sm btn-secondary" onClick={() => setShowLogPast(true)}><Plus size={14} /></button>
           <button className={`btn btn-sm ${view === 'calendar' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('calendar')}><Calendar size={14} /></button>
           <button className={`btn btn-sm ${view === 'list' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView('list')}><List size={14} /></button>
         </div>

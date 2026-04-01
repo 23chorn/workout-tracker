@@ -9,7 +9,7 @@ import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucid
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
-import { ScrollPicker, weightValues, dumbbellWeightValues, repValues } from '../components/ScrollPicker';
+import { ScrollPicker, weightValues, dumbbellWeightValues, bodyweightWeightValues, repValues } from '../components/ScrollPicker';
 
 interface ExerciseState {
   exerciseId: number;
@@ -44,6 +44,7 @@ export function TodayScreen() {
 
   const WEIGHTS = weightValues();
   const DB_WEIGHTS = dumbbellWeightValues();
+  const BW_WEIGHTS = bodyweightWeightValues();
   const REPS = repValues();
   const [summary, setSummary] = useState<SessionSummaryData | null>(null);
   const [selectedDayLabel, setSelectedDayLabel] = useState<string | null>(null);
@@ -799,13 +800,13 @@ export function TodayScreen() {
               }
 
               return (
-                <div className="set-row" key={setIdx} style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px' }}>
+                <div className="set-row" key={setIdx} style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px', opacity: isConfirmed ? 0.45 : 1, transition: 'opacity 0.2s' }}>
                   <span className="set-num">{setIdx + 1}</span>
                   <button
                     className="picker-input"
                     onClick={() => setPicker({ exIdx, setIdx, field: 'weight' })}
                   >
-                    {set.weight ? <span>{set.weight}</span> : <span className="placeholder">kg</span>}
+                    {set.weight !== '' ? <span>{exercise?.category === 'bodyweight' ? `+${set.weight}` : set.weight}</span> : <span className="placeholder">{exercise?.category === 'bodyweight' ? '+kg' : 'kg'}</span>}
                   </button>
                   <button
                     className="picker-input"
@@ -947,19 +948,26 @@ export function TodayScreen() {
 
       {picker && (
         <ScrollPicker
-          label={picker.field === 'weight' ? 'Weight (kg)' : 'Reps'}
+          label={picker.field === 'weight'
+            ? (exercises.get(exerciseStates[picker.exIdx]?.exerciseId)?.category === 'bodyweight' ? 'Added Weight (kg)' : 'Weight (kg)')
+            : 'Reps'}
           values={picker.field === 'weight'
-            ? (exercises.get(exerciseStates[picker.exIdx]?.exerciseId)?.category === 'dumbbell' ? DB_WEIGHTS : WEIGHTS)
+            ? ((() => {
+                const cat = exercises.get(exerciseStates[picker.exIdx]?.exerciseId)?.category;
+                return cat === 'bodyweight' ? BW_WEIGHTS : cat === 'dumbbell' ? DB_WEIGHTS : WEIGHTS;
+              })())
             : REPS}
           value={(() => {
             const es = exerciseStates[picker.exIdx];
             const set = es?.sets[picker.setIdx];
             if (picker.field === 'weight') {
-              return set?.weight || (es?.suggestedWeight ? String(es.suggestedWeight) : '20');
+              if (set?.weight !== undefined && set.weight !== '') return set.weight;
+              return es?.suggestedWeight != null ? String(es.suggestedWeight) : '0';
             }
             // Default reps to midpoint of rep range
             const mid = es ? Math.round((es.repRange[0] + es.repRange[1]) / 2) : 10;
-            return set?.reps || String(mid);
+            if (set?.reps !== undefined && set.reps !== '') return set.reps;
+            return String(mid);
           })()}
           suffix={picker.field === 'weight' ? 'kg' : undefined}
           onChange={(val) => updateSet(picker.exIdx, picker.setIdx, picker.field, val)}

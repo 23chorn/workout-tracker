@@ -119,8 +119,15 @@ export function weightValues(max = 200, step = 2.5): number[] {
 
 export function dumbbellWeightValues(max = 100): number[] {
   const vals: number[] = [0];
-  for (let w = 2; w < 10; w += 2) vals.push(w);
-  for (let w = 10; w <= max; w += 4) vals.push(w);
+  for (let w = 2; w <= max; w += 2) vals.push(w);
+  return vals;
+}
+
+export function bodyweightWeightValues(max = 80, step = 2.5): number[] {
+  const vals: number[] = [];
+  for (let w = 0; w <= max; w += step) {
+    vals.push(Math.round(w * 10) / 10);
+  }
   return vals;
 }
 
