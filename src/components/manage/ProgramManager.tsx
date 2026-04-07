@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Program, type ProgramDay } from '../../db/database';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { setNavGuard } from '../../utils/navGuard';
 import { Plus, Trash2, X } from 'lucide-react';
 
 export function ProgramManager() {
@@ -17,6 +18,19 @@ export function ProgramManager() {
   });
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const pendingNavRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setNavGuard(null);
+      return;
+    }
+    setNavGuard((proceed) => {
+      pendingNavRef.current = proceed;
+      setShowCancelConfirm(true);
+    });
+    return () => setNavGuard(null);
+  }, [editing]);
 
   const setAsDefault = (id: number) => { localStorage.setItem('lift-default-program', String(id)); setDefaultProgramId(id); };
   const startNew = () => { setName(''); setDays([]); setEditing({ name: '', days: [] }); };
@@ -64,7 +78,23 @@ export function ProgramManager() {
         <button className="btn btn-secondary btn-full mb-md" onClick={addDay}><Plus size={16} /> Add Day</button>
         <button className="btn btn-primary btn-full" onClick={save}>Save Program</button>
         {showCancelConfirm && (
-          <ConfirmDialog title="Discard Changes" message="You have unsaved changes. Discard them?" confirmLabel="Discard" destructive onConfirm={() => { setShowCancelConfirm(false); setEditing(null); }} onCancel={() => setShowCancelConfirm(false)} />
+          <ConfirmDialog
+            title="Discard Changes"
+            message="You have unsaved changes. Discard them?"
+            confirmLabel="Discard"
+            destructive
+            onConfirm={() => {
+              setShowCancelConfirm(false);
+              setEditing(null);
+              const nav = pendingNavRef.current;
+              pendingNavRef.current = null;
+              if (nav) nav();
+            }}
+            onCancel={() => {
+              setShowCancelConfirm(false);
+              pendingNavRef.current = null;
+            }}
+          />
         )}
       </div>
     );

@@ -6,6 +6,7 @@ import { StatsScreen } from './screens/StatsScreen';
 import { ManageScreen } from './screens/ManageScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { RowingScreen } from './screens/rowing/RowingScreen';
+import { requestNav } from './utils/navGuard';
 
 type TabId = 'lift' | 'rowing' | 'history' | 'stats' | 'manage' | 'settings';
 
@@ -43,7 +44,10 @@ export function App() {
             <a
               key={t.id}
               className={tab === t.id ? 'active' : ''}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                if (t.id === tab) return;
+                requestNav(() => setTab(t.id));
+              }}
             >
               <t.icon size={18} />
               {t.label}

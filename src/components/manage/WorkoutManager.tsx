@@ -1,9 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { setNavGuard } from '../../utils/navGuard';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Workout, type WorkoutExercise } from '../../db/database';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ExercisePicker } from '../ExercisePicker';
+import { ScrollPicker } from '../ScrollPicker';
 import { Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react';
+
+type PickerField = 'sets' | 'repMin' | 'repMax' | 'restSeconds';
+
+const SETS_VALUES = Array.from({ length: 10 }, (_, i) => i + 1);
+const REP_VALUES = Array.from({ length: 30 }, (_, i) => i + 1);
+const REST_VALUES = Array.from({ length: 20 }, (_, i) => (i + 1) * 30); // 30s..600s
+
+const formatRest = (s: number) => {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${m}:00` : `${m}:${String(r).padStart(2, '0')}`;
+};
 
 export function WorkoutManager() {
   const workouts = useLiveQuery(() => db.workouts.toArray()) ?? [];
@@ -14,6 +29,20 @@ export function WorkoutManager() {
   const [showPicker, setShowPicker] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [picker, setPicker] = useState<{ idx: number; field: PickerField } | null>(null);
+  const pendingNavRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setNavGuard(null);
+      return;
+    }
+    setNavGuard((proceed) => {
+      pendingNavRef.current = proceed;
+      setShowCancelConfirm(true);
+    });
+    return () => setNavGuard(null);
+  }, [editing]);
 
   const startNew = () => { setName(''); setWExercises([]); setEditing({ name: '', exercises: [] }); };
   const startEdit = (w: Workout) => { setName(w.name); setWExercises([...w.exercises]); setEditing(w); };
@@ -24,7 +53,7 @@ export function WorkoutManager() {
     setWExercises(prev => [...prev, { exerciseId: exId, sets: 3, repRange: [8, 12] as [number, number], restSeconds: ex.defaultRestSeconds }]);
   };
 
-  const updateWExercise = (idx: number, field: string, raw: string) => {
+  const updateWExercise = (idx: number, field: PickerField, raw: string) => {
     const value = raw === '' ? 0 : parseInt(raw);
     if (isNaN(value)) return;
     setWExercises(prev => {
@@ -90,17 +119,74 @@ export function WorkoutManager() {
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-                <div className="form-group" style={{ marginBottom: 0 }}><label>Sets</label><input type="number" value={we.sets || ''} onChange={e => updateWExercise(idx, 'sets', e.target.value)} /></div>
-                <div className="form-group" style={{ marginBottom: 0 }}><label>Min</label><input type="number" value={we.repRange[0] || ''} onChange={e => updateWExercise(idx, 'repMin', e.target.value)} /></div>
-                <div className="form-group" style={{ marginBottom: 0 }}><label>Max</label><input type="number" value={we.repRange[1] || ''} onChange={e => updateWExercise(idx, 'repMax', e.target.value)} /></div>
-                <div className="form-group" style={{ marginBottom: 0 }}><label>Rest</label><input type="number" value={we.restSeconds || ''} onChange={e => updateWExercise(idx, 'restSeconds', e.target.value)} /></div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Sets</label>
+                  <button className="picker-input" onClick={() => setPicker({ idx, field: 'sets' })}>{we.sets || '—'}</button>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Min</label>
+                  <button className="picker-input" onClick={() => setPicker({ idx, field: 'repMin' })}>{we.repRange[0] || '—'}</button>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Max</label>
+                  <button className="picker-input" onClick={() => setPicker({ idx, field: 'repMax' })}>{we.repRange[1] || '—'}</button>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Rest</label>
+                  <button className="picker-input" onClick={() => setPicker({ idx, field: 'restSeconds' })}>{we.restSeconds ? formatRest(we.restSeconds) : '—'}</button>
+                </div>
               </div>
             </div>
           );
         })}
         <button className="btn btn-primary btn-full mt-md" onClick={save}>Save Workout</button>
+        {picker && (() => {
+          const we = wExercises[picker.idx];
+          if (!we) return null;
+          const config = picker.field === 'sets'
+            ? { label: 'Sets', values: SETS_VALUES, current: we.sets }
+            : picker.field === 'repMin'
+            ? { label: 'Min Reps', values: REP_VALUES, current: we.repRange[0] }
+            : picker.field === 'repMax'
+            ? { label: 'Max Reps', values: REP_VALUES, current: we.repRange[1] }
+            : { label: 'Rest', values: REST_VALUES, current: we.restSeconds };
+          const displayValues = picker.field === 'restSeconds' ? REST_VALUES.map(formatRest) : config.values;
+          const currentDisplay = picker.field === 'restSeconds' ? formatRest(config.current) : String(config.current);
+          return (
+            <ScrollPicker
+              label={config.label}
+              values={displayValues}
+              value={currentDisplay}
+              onChange={(val) => {
+                if (picker.field === 'restSeconds') {
+                  const sec = REST_VALUES[displayValues.findIndex(v => String(v) === val)];
+                  updateWExercise(picker.idx, 'restSeconds', String(sec));
+                } else {
+                  updateWExercise(picker.idx, picker.field, val);
+                }
+              }}
+              onClose={() => setPicker(null)}
+            />
+          );
+        })()}
         {showCancelConfirm && (
-          <ConfirmDialog title="Discard Changes" message="You have unsaved changes. Discard them?" confirmLabel="Discard" destructive onConfirm={() => { setShowCancelConfirm(false); setEditing(null); }} onCancel={() => setShowCancelConfirm(false)} />
+          <ConfirmDialog
+            title="Discard Changes"
+            message="You have unsaved changes. Discard them?"
+            confirmLabel="Discard"
+            destructive
+            onConfirm={() => {
+              setShowCancelConfirm(false);
+              setEditing(null);
+              const nav = pendingNavRef.current;
+              pendingNavRef.current = null;
+              if (nav) nav();
+            }}
+            onCancel={() => {
+              setShowCancelConfirm(false);
+              pendingNavRef.current = null;
+            }}
+          />
         )}
       </div>
     );

@@ -108,7 +108,7 @@ export function LogPastSession({ onBack, onSaved }: { onBack: () => void; onSave
 
     const exercises: SessionExercise[] = entries.map(e => {
       const sets = e.sets
-        .filter(s => s.weight && s.reps)
+        .filter(s => s.weight !== '' && s.reps !== '')
         .map(s => ({ weight: parseFloat(s.weight), reps: parseInt(s.reps), isWorkingSet: s.isWorkingSet }));
       return {
         exerciseId: e.exerciseId,
@@ -300,7 +300,7 @@ export function LogPastSession({ onBack, onSaved }: { onBack: () => void; onSave
         className="btn btn-primary"
         style={{ width: '100%', marginBottom: 24 }}
         onClick={save}
-        disabled={entries.length === 0 || entries.every(e => e.sets.every(s => !s.weight || !s.reps))}
+        disabled={entries.length === 0 || entries.every(e => e.sets.every(s => s.weight === '' || s.reps === ''))}
       >
         Save Session
       </button>
@@ -315,7 +315,8 @@ export function LogPastSession({ onBack, onSaved }: { onBack: () => void; onSave
             const entry = entries[picker.exIdx];
             const set = entry?.sets[picker.setIdx];
             if (picker.field === 'weight') {
-              return set?.weight || '20';
+              if (set?.weight !== undefined && set.weight !== '') return set.weight;
+              return entries[picker.exIdx]?.exercise.category === 'bodyweight' ? '0' : '20';
             }
             return set?.reps || '10';
           })()}

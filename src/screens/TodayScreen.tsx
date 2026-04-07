@@ -97,6 +97,7 @@ export function TodayScreen() {
           suggestionReason: s.suggestionReason,
           repRange: s.repRange,
           numSets: s.numSets,
+          lastSession: s.lastSession,
         })),
         confirmedSets: [...confirmedRef.current],
       };
@@ -130,6 +131,7 @@ export function TodayScreen() {
         suggestionReason: s.suggestionReason,
         repRange: s.repRange,
         numSets: s.numSets,
+        lastSession: s.lastSession,
       })));
 
       // Restore confirmed sets and auto-collapse fully confirmed exercises
@@ -213,6 +215,7 @@ export function TodayScreen() {
         suggestionReason: s.suggestionReason,
         repRange: s.repRange,
         numSets: s.numSets,
+        lastSession: s.lastSession,
       })),
     };
     await db.activeSession.clear();
@@ -374,7 +377,7 @@ export function TodayScreen() {
 
     const sessionExercises: SessionExercise[] = exerciseStates.map(es => {
       const sets: SessionSet[] = es.sets
-        .filter(s => s.weight && s.reps)
+        .filter(s => s.weight !== '' && s.reps !== '')
         .map(s => ({
           weight: parseFloat(s.weight),
           reps: parseInt(s.reps),
@@ -630,7 +633,7 @@ export function TodayScreen() {
         const showTimerHere = timer.active && confirmedSets.size > 0 && exIdx === firstUncompletedIdx;
 
         const filledSets = es.sets
-          .filter(s => s.weight && s.reps && s.isWorkingSet)
+          .filter(s => s.weight !== '' && s.reps !== '' && s.isWorkingSet)
           .map(s => ({ weight: parseFloat(s.weight), reps: parseInt(s.reps), isWorkingSet: true }));
         const avgE10rm = sessionE10RM(filledSets);
 
@@ -815,7 +818,7 @@ export function TodayScreen() {
                     {set.reps ? <span>{set.reps}</span> : <span className="placeholder">reps</span>}
                   </button>
                   <span style={{ textAlign: 'center', fontSize: 12, color: setE10rm > 0 ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                    {setE10rm > 0 ? setE10rm.toFixed(0) : '—'}
+                    {setE10rm > 0 ? setE10rm.toFixed(1) : '—'}
                   </span>
                   <button
                     className="working-toggle"

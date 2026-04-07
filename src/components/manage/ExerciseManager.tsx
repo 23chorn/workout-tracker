@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { setNavGuard } from '../../utils/navGuard';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type ExerciseCategory } from '../../db/database';
 import { ExerciseDetail } from '../ExerciseDetail';
@@ -110,6 +111,21 @@ export function ExerciseManager() {
   const [editCategory, setEditCategory] = useState<ExerciseCategory | ''>('');
   const [editRest, setEditRest] = useState('');
   const [editPicker, setEditPicker] = useState<'muscle' | 'secondary' | 'category' | null>(null);
+  const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
+  const pendingNavRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const active = editingFields || showAdd;
+    if (!active) {
+      setNavGuard(null);
+      return;
+    }
+    setNavGuard((proceed) => {
+      pendingNavRef.current = proceed;
+      setShowDiscardPrompt(true);
+    });
+    return () => setNavGuard(null);
+  }, [editingFields, showAdd]);
 
   const ALL_MUSCLES = [...new Set(exercises.flatMap(e => [e.muscleGroup, ...(e.secondaryMuscleGroup ? [e.secondaryMuscleGroup] : [])]))].sort();
   const CATEGORIES: ExerciseCategory[] = ['barbell', 'dumbbell', 'machine', 'bodyweight'];
@@ -279,6 +295,27 @@ export function ExerciseManager() {
             )}
           </div>
         </div>
+      )}
+
+      {showDiscardPrompt && (
+        <ConfirmDialog
+          title="Discard Changes"
+          message="You have unsaved changes. Discard them?"
+          confirmLabel="Discard"
+          destructive
+          onConfirm={() => {
+            setShowDiscardPrompt(false);
+            setEditingFields(false);
+            setShowAdd(false);
+            const nav = pendingNavRef.current;
+            pendingNavRef.current = null;
+            if (nav) nav();
+          }}
+          onCancel={() => {
+            setShowDiscardPrompt(false);
+            pendingNavRef.current = null;
+          }}
+        />
       )}
 
       {groups.map(group => (

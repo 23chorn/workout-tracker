@@ -119,19 +119,25 @@ function PersonalBests({ sessions, onSelectExercise }: {
   const exMap = new Map(allExercises.map(e => [e.id!, e]));
 
   const bests = useMemo(() => {
-    const map = new Map<number, { e10RM: number; date: string }>();
+    const map = new Map<number, { e10RM: number; date: string; sessions: number }>();
     for (const s of sessions) {
       for (const ex of s.exercises) {
         if (ex.e10RM <= 0) continue;
         const current = map.get(ex.exerciseId);
-        if (!current || ex.e10RM > current.e10RM) {
-          map.set(ex.exerciseId, { e10RM: ex.e10RM, date: s.date });
+        if (!current) {
+          map.set(ex.exerciseId, { e10RM: ex.e10RM, date: s.date, sessions: 1 });
+        } else {
+          current.sessions++;
+          if (ex.e10RM > current.e10RM) {
+            current.e10RM = ex.e10RM;
+            current.date = s.date;
+          }
         }
       }
     }
     return [...map.entries()]
       .map(([id, data]) => ({ id, name: exMap.get(id)?.name ?? 'Unknown', ...data }))
-      .sort((a, b) => b.e10RM - a.e10RM)
+      .sort((a, b) => b.sessions - a.sessions || b.e10RM - a.e10RM)
       .slice(0, 10);
   }, [sessions, exMap]);
 
@@ -185,23 +191,21 @@ export function StatsScreen() {
       }
     }
 
-    // Week streak: consecutive weeks with at least 1 session
+    // Week streak: consecutive weeks (ending this week or last week) with >=1 session
     const weeksSeen = new Set<string>();
     for (const s of sessions) {
       weeksSeen.add(getWeekKey(new Date(s.date)));
     }
-    const sortedWeeks = [...weeksSeen].sort().reverse();
     let streak = 0;
-    const currentWeek = getWeekKey(new Date());
-    for (let i = 0; i < sortedWeeks.length; i++) {
-      const expected = new Date(currentWeek);
-      expected.setDate(expected.getDate() - i * 7);
-      const expectedKey = getWeekKey(expected);
-      if (sortedWeeks[i] === expectedKey) {
-        streak++;
-      } else {
-        break;
-      }
+    const cursor = new Date();
+    cursor.setHours(12, 0, 0, 0); // avoid DST edge cases
+    // If this week has no sessions yet, start counting from last week so the streak isn't broken mid-week
+    if (!weeksSeen.has(getWeekKey(cursor))) {
+      cursor.setDate(cursor.getDate() - 7);
+    }
+    while (weeksSeen.has(getWeekKey(cursor))) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 7);
     }
 
     // Average sessions per week
