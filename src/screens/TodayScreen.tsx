@@ -326,7 +326,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
         suggestionReason: s.suggestionReason,
         repRange: s.repRange,
         numSets: s.numSets,
-        lastSession: s.lastSession,
+        lastSession: s.lastSession ? { ...s.lastSession, e10RM: s.lastSession.e10RM ?? 0 } : undefined,
       })));
 
       // Restore confirmed sets and auto-collapse fully confirmed exercises
@@ -480,7 +480,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
     const prevEx = prevSession?.exercises.find(e => e.exerciseId === exerciseId);
     const prevWorking = prevEx?.sets.filter(s => s.isWorkingSet) ?? [];
     const lastSession = prevWorking.length > 0
-      ? { weight: prevWorking[0].weight, reps: prevWorking.map(s => s.reps) }
+      ? { weight: prevWorking[0].weight, reps: prevWorking.map(s => s.reps), e10RM: prevEx?.e10RM ?? 0 }
       : undefined;
     const newState: ExerciseState = {
       exerciseId,
