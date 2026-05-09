@@ -80,7 +80,7 @@ export interface ActiveSession {
     suggestionReason: string;
     repRange: [number, number];
     numSets: number;
-    lastSession?: { weight: number; reps: number[] };
+    lastSession?: { weight: number; reps: number[]; e10RM?: number };
   }[];
   confirmedSets?: string[];
   restTimerEnd?: string;
