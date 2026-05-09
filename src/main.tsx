@@ -4,11 +4,15 @@ import './index.css';
 import { App } from './App';
 import { seedDatabase } from './db/seed';
 import { seedRowingPrograms } from './db/rowingSeed';
+import { seedStrengthPlan } from './db/strengthPlan';
 import { isDemoMode, ensureDemoData } from './db/demo';
 
 async function init() {
   await seedDatabase();
   await seedRowingPrograms();
+  if (!isDemoMode()) {
+    await seedStrengthPlan();
+  }
   if (isDemoMode()) {
     await ensureDemoData();
   }

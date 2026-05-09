@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
+import { seedStrengthPlan } from '../db/strengthPlan';
 import { exportData, importData } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -81,6 +83,30 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importSuccess, setImportSuccess] = useState<boolean | null>(null);
   const [rowingEnabled, setRowingEnabled] = useState(localStorage.getItem('lift-rowing-enabled') === '1');
+  const plans = useLiveQuery(() => db.liftingPlans.toArray()) ?? [];
+  const activeProgress = useLiveQuery(() => db.liftingPlanProgress.filter(p => p.active).first()) ?? null;
+
+  const togglePlan = async () => {
+    if (activeProgress) {
+      // Disable — mark all inactive
+      await db.liftingPlanProgress.toCollection().modify({ active: false });
+    } else if (plans.length > 0) {
+      // Re-enable the first available plan
+      await db.liftingPlanProgress.clear();
+      await db.liftingPlanProgress.add({ planId: plans[0].id!, active: true });
+    } else {
+      // No plan seeded yet — seed it and enable
+      await seedStrengthPlan();
+    }
+  };
+
+  const restartPlan = async () => {
+    if (plans.length === 0) return;
+    const plan = plans[0];
+    await db.liftingPlans.update(plan.id!, { startDate: new Date().toISOString().split('T')[0] });
+    await db.liftingPlanProgress.clear();
+    await db.liftingPlanProgress.add({ planId: plan.id!, active: true });
+  };
 
   const toggleDemo = async () => {
     setDemoLoading(true);
@@ -132,6 +158,29 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
         <button className="btn btn-secondary btn-full" onClick={() => setShowHelp(true)}>
           Help &amp; Guide
         </button>
+      </div>
+
+      {/* Lifting Plan */}
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 16 }}>Lifting Plan</h2>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>
+              {plans[0]?.name ?? '24-Week Strength + Pete Plan'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {activeProgress ? 'Active — driving Today screen' : 'Off — use manual programs'}
+            </div>
+          </div>
+          <button onClick={togglePlan} style={{ width: 48, height: 28, borderRadius: 14, padding: 2, cursor: 'pointer', background: activeProgress ? 'var(--accent)' : 'var(--border)', border: 'none', transition: 'background 0.2s', position: 'relative' }}>
+            <div style={{ width: 24, height: 24, borderRadius: 12, background: 'white', transition: 'transform 0.2s', transform: activeProgress ? 'translateX(20px)' : 'translateX(0)' }} />
+          </button>
+        </div>
+        {plans.length > 0 && (
+          <button className="btn btn-sm btn-secondary btn-full" onClick={restartPlan}>
+            Restart plan from today
+          </button>
+        )}
       </div>
 
       {/* Modules */}

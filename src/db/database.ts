@@ -87,6 +87,55 @@ export interface ActiveSession {
   restTimerTotal?: number;
 }
 
+// Lifting plan types
+
+export type ProgressionScheme = 'linear' | 'top-set-backoff' | 'wave-3week' | 'maintain';
+
+export type RowingSlot = 1 | 2 | 3 | 'optional';
+
+export interface PhaseDay {
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Mon
+  label: string;
+  workoutId?: number;
+  rowingSlot?: RowingSlot;
+}
+
+export interface PhaseSchemeOverride {
+  exerciseId: number;
+  scheme: ProgressionScheme;
+}
+
+export interface LiftingPhase {
+  name: string;
+  startWeek: number;
+  endWeek: number;
+  notes?: string;
+  days: PhaseDay[];
+  defaultScheme: ProgressionScheme;
+  schemeOverrides?: PhaseSchemeOverride[];
+}
+
+export interface LiftingPlanTarget {
+  exerciseId: number;
+  startWeight: number;
+  targetWeight: number;
+}
+
+export interface LiftingPlan {
+  id?: number;
+  name: string;
+  startDate: string;
+  phases: LiftingPhase[];
+  targets: LiftingPlanTarget[];
+  rowingPlanId?: number;
+}
+
+export interface LiftingPlanProgress {
+  id?: number;
+  planId: number;
+  active: boolean;
+}
+
 // Rowing types
 
 export interface RowingProgramSession {
@@ -150,6 +199,8 @@ type LiftDB = Dexie & {
   rowingProgress: EntityTable<RowingProgress, 'id'>;
   rowingSessions: EntityTable<RowingSession, 'id'>;
   bodyWeight: EntityTable<BodyWeightEntry, 'id'>;
+  liftingPlans: EntityTable<LiftingPlan, 'id'>;
+  liftingPlanProgress: EntityTable<LiftingPlanProgress, 'id'>;
 };
 
 function createDB(name: string): LiftDB {
@@ -194,6 +245,19 @@ function createDB(name: string): LiftDB {
     rowingProgress: '++id, currentProgramId',
     rowingSessions: '++id, date, type, programId',
     bodyWeight: '++id, date',
+  });
+  d.version(6).stores({
+    exercises: '++id, name, muscleGroup',
+    workouts: '++id, name',
+    programs: '++id, name',
+    sessions: '++id, date, programId, workoutId',
+    activeSession: '++id',
+    rowingPrograms: '++id, name',
+    rowingProgress: '++id, currentProgramId',
+    rowingSessions: '++id, date, type, programId',
+    bodyWeight: '++id, date',
+    liftingPlans: '++id, name',
+    liftingPlanProgress: '++id, planId',
   });
   return d;
 }

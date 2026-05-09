@@ -31,7 +31,7 @@ export function App() {
 
   return (
     <div className="app">
-      {tab === 'lift' && <TodayScreen />}
+      {tab === 'lift' && <TodayScreen onNavigateRowing={rowingEnabled ? () => setTab('rowing') : undefined} />}
       {tab === 'rowing' && rowingEnabled && <RowingScreen />}
       {tab === 'history' && <HistoryScreen />}
       {tab === 'stats' && <StatsScreen />}

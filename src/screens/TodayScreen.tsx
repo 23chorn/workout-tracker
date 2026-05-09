@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Exercise, type SessionSet, type SessionExercise, type ActiveSession } from '../db/database';
+import { db, type Exercise, type SessionSet, type SessionExercise, type ActiveSession, type LiftingPlan } from '../db/database';
 import { getSuggestion } from '../utils/progression';
+import { getTodayContext, skipDay, type TodayContext } from '../utils/plan';
 import { calcE10RM, sessionE10RM } from '../utils/e10rm';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
@@ -10,6 +11,191 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
 import { ScrollPicker, weightValues, dumbbellWeightValues, bodyweightWeightValues, repValues } from '../components/ScrollPicker';
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function PlanOverviewModal({ ctx, onClose }: { ctx: TodayContext; onClose: () => void }) {
+  const allWorkouts = useLiveQuery(() => db.workouts.toArray()) ?? [];
+  const allExercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
+  const workoutMap = new Map(allWorkouts.map(w => [w.id!, w]));
+  const exMap = new Map(allExercises.map(e => [e.id!, e]));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="row-between mb-md">
+          <h2 style={{ marginBottom: 0 }}>{ctx.plan.name}</h2>
+          <button className="btn btn-sm btn-secondary" onClick={onClose}>Close</button>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+          Started {new Date(ctx.plan.startDate).toLocaleDateString()} · Currently in {ctx.phase.name}, Week {ctx.week}
+        </div>
+
+        {ctx.plan.phases.map((phase) => {
+          const isCurrent = ctx.week >= phase.startWeek && ctx.week <= phase.endWeek;
+          return (
+            <div key={phase.name} style={{ marginBottom: 20 }}>
+              <div style={{
+                fontSize: 14, fontWeight: 700, marginBottom: 4,
+                color: isCurrent ? 'var(--accent)' : 'var(--text)',
+              }}>
+                {phase.name} — Weeks {phase.startWeek}–{phase.endWeek}
+                {isCurrent && <span style={{ fontSize: 11, marginLeft: 8, color: 'var(--accent)' }}>• current</span>}
+              </div>
+              {phase.notes && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 8 }}>
+                  {phase.notes}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {phase.days.map((day) => {
+                  const wk = day.workoutId ? workoutMap.get(day.workoutId) : null;
+                  const isRest = !day.workoutId && !day.rowingSlot;
+                  return (
+                    <div
+                      key={day.dayOfWeek}
+                      className="card"
+                      style={{ padding: 10, marginBottom: 0, background: isRest ? 'transparent' : 'var(--bg-card)' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>
+                            {DAY_NAMES[day.dayOfWeek]} — {day.label}
+                          </div>
+                          {wk && (
+                            <>
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{wk.name}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                                {wk.exercises.map(we => {
+                                  const ex = exMap.get(we.exerciseId);
+                                  const name = ex?.name ?? '?';
+                                  const range = we.repRange[0] === we.repRange[1]
+                                    ? `${we.repRange[0]}`
+                                    : `${we.repRange[0]}-${we.repRange[1]}`;
+                                  return `${name} ${we.sets}×${range}`;
+                                }).join(' · ')}
+                              </div>
+                            </>
+                          )}
+                          {day.rowingSlot && !wk && (
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>Rowing only (slot {day.rowingSlot})</div>
+                          )}
+                          {day.rowingSlot && wk && (
+                            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>+ Rowing slot {day.rowingSlot}</div>
+                          )}
+                          {isRest && (
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Rest</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Strength Targets</div>
+          {ctx.plan.targets.map(t => {
+            const ex = exMap.get(t.exerciseId);
+            return (
+              <div key={t.exerciseId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                <span>{ex?.name ?? 'Unknown'}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{t.startWeight}kg → {t.targetWeight}kg</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanTodayCard({ ctx, workoutName, onStart, onSkip, onOpenRowing }: {
+  ctx: TodayContext;
+  workoutName: string;
+  onStart: () => void;
+  onSkip: () => void;
+  onOpenRowing?: () => void;
+}) {
+  const [showOverview, setShowOverview] = useState(false);
+  const dayName = DAY_NAMES[ctx.phaseDay.dayOfWeek];
+  const isRest = !ctx.phaseDay.workoutId;
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+          {ctx.plan.name}
+        </div>
+        <div className="title" style={{ fontSize: 16, marginBottom: 2 }}>
+          {ctx.phase.name} · Week {ctx.week} · {dayName}
+        </div>
+        <div className="subtitle" style={{ marginBottom: 8 }}>
+          {ctx.phaseDay.label}{workoutName && ` — ${workoutName}`}
+        </div>
+        {ctx.phase.notes && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 8 }}>
+            {ctx.phase.notes}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!isRest && (
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={onStart}>
+              Start Workout
+            </button>
+          )}
+          <button className="btn btn-secondary" style={{ flex: isRest ? 1 : 0 }} onClick={onSkip}>
+            Skip Day
+          </button>
+        </div>
+        <button
+          className="btn btn-sm btn-secondary btn-full"
+          style={{ marginTop: 8, fontSize: 12 }}
+          onClick={() => setShowOverview(true)}
+        >
+          View Full Plan
+        </button>
+      </div>
+
+      {showOverview && <PlanOverviewModal ctx={ctx} onClose={() => setShowOverview(false)} />}
+
+      {isRest && (
+        <div className="card" style={{ marginBottom: 12, textAlign: 'center', color: 'var(--text-muted)' }}>
+          Rest day — no workout scheduled.
+        </div>
+      )}
+
+      {ctx.rowingSession && (
+        <button
+          className="card"
+          style={{ width: '100%', textAlign: 'left', cursor: onOpenRowing ? 'pointer' : 'default', marginBottom: 12 }}
+          onClick={onOpenRowing}
+          disabled={!onOpenRowing}
+        >
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+            Rowing today
+          </div>
+          <div className="title" style={{ fontSize: 15, marginBottom: 4 }}>
+            {ctx.rowingSession.target}
+          </div>
+          {ctx.rowingSession.guidance && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+              {ctx.rowingSession.guidance}
+            </div>
+          )}
+          {onOpenRowing && (
+            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6 }}>
+              Tap to open rowing →
+            </div>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface ExerciseState {
   exerciseId: number;
@@ -22,8 +208,17 @@ interface ExerciseState {
   lastSession?: { weight: number; reps: number[] };
 }
 
-export function TodayScreen() {
+export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => void } = {}) {
   const programs = useLiveQuery(() => db.programs.toArray()) ?? [];
+  const activePlanProgress = useLiveQuery(() => db.liftingPlanProgress.filter(p => p.active).first()) ?? null;
+  const activePlan = useLiveQuery(
+    async () => {
+      if (!activePlanProgress) return null;
+      return (await db.liftingPlans.get(activePlanProgress.planId)) ?? null;
+    },
+    [activePlanProgress?.planId],
+  ) as LiftingPlan | null | undefined;
+  const planContext: TodayContext | null = activePlan ? getTodayContext(activePlan) : null;
   const allExercises = useLiveQuery(() => db.exercises.orderBy('name').toArray()) ?? [];
   const allWorkouts = useLiveQuery(() => db.workouts.toArray()) ?? [];
   const workoutMap = new Map(allWorkouts.map(w => [w.id!, w]));
@@ -68,7 +263,7 @@ export function TodayScreen() {
   const [workoutId, setWorkoutId] = useState<number>(0);
   const [startedAt, setStartedAt] = useState('');
   const timer = useRestTimer();
-  const inlineTimerRef = useRef<HTMLDivElement>(null);
+  const [inlineTimerEl, setInlineTimerEl] = useState<HTMLDivElement | null>(null);
   const [inlineTimerVisible, setInlineTimerVisible] = useState(true);
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -447,17 +642,16 @@ export function TodayScreen() {
 
   // Track if inline timer is scrolled out of view
   useEffect(() => {
-    const el = inlineTimerRef.current;
-    if (!el) { setInlineTimerVisible(true); return; }
-    const screen = el.closest('.screen');
+    if (!inlineTimerEl) { setInlineTimerVisible(true); return; }
+    const screen = inlineTimerEl.closest('.screen');
     if (!screen) return;
     const observer = new IntersectionObserver(
       ([entry]) => setInlineTimerVisible(entry.isIntersecting),
       { root: screen, threshold: 0 }
     );
-    observer.observe(el);
+    observer.observe(inlineTimerEl);
     return () => observer.disconnect();
-  });
+  }, [inlineTimerEl]);
 
   // Live elapsed time — always computed from startedAt timestamp
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -486,7 +680,38 @@ export function TodayScreen() {
       <div className="screen">
         <h1>Today</h1>
 
-        {programs.length === 0 ? (
+        {planContext ? (
+          <PlanTodayCard
+            ctx={planContext}
+            workoutName={planContext.phaseDay.workoutId ? (workoutMap.get(planContext.phaseDay.workoutId)?.name ?? '') : ''}
+            onStart={() => {
+              const wkId = planContext.phaseDay.workoutId;
+              if (!wkId) return;
+              const wk = workoutMap.get(wkId);
+              const dayLabel = `${planContext.phase.name} · Wk ${planContext.week} · ${planContext.phaseDay.label}`;
+              setConfirmAction({
+                title: 'Start Session',
+                message: `Start ${wk?.name ?? planContext.phaseDay.label}?`,
+                onConfirm: () => {
+                  setConfirmAction(null);
+                  setSelectedDayLabel(dayLabel);
+                  loadSession(planContext.plan.id!, planContext.plan.name, dayLabel, wkId);
+                },
+              });
+            }}
+            onSkip={() => {
+              setConfirmAction({
+                title: 'Skip Day',
+                message: 'Skip today? The plan will shift forward by one day.',
+                onConfirm: async () => {
+                  setConfirmAction(null);
+                  await skipDay(planContext.plan.id!);
+                },
+              });
+            }}
+            onOpenRowing={onNavigateRowing}
+          />
+        ) : programs.length === 0 ? (
           <div className="empty">
             <p>No programs yet. Create one in the Manage tab.</p>
           </div>
@@ -598,11 +823,6 @@ export function TodayScreen() {
           zIndex: 50,
           opacity: inlineTimerVisible ? 0 : 1,
           pointerEvents: inlineTimerVisible ? 'none' : 'auto',
-          maxHeight: inlineTimerVisible ? 0 : 200,
-          padding: inlineTimerVisible ? 0 : undefined,
-          marginBottom: inlineTimerVisible ? 0 : undefined,
-          borderWidth: inlineTimerVisible ? 0 : undefined,
-          overflow: 'hidden',
           transition: 'opacity 0.15s ease',
         }}>
           <div style={{ flex: 1 }}>
@@ -640,7 +860,7 @@ export function TodayScreen() {
         return (
           <div key={`${es.exerciseId}-${exIdx}`}>
           {showTimerHere && (
-            <div className="timer-bar" ref={inlineTimerRef}>
+            <div className="timer-bar" ref={setInlineTimerEl}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
                   {timer.expired ? 'Rest Over' : 'Rest Timer'}

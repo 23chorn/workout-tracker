@@ -29,12 +29,19 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
     }
     return Math.max(0, idx);
   });
+  const [manualMode, setManualMode] = useState(false);
+  const [manualValue, setManualValue] = useState('');
+  const manualInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = selectedIdx * ITEM_HEIGHT;
   }, []);
+
+  useEffect(() => {
+    if (manualMode) manualInputRef.current?.focus();
+  }, [manualMode]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -49,60 +56,109 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
     onClose();
   };
 
+  const confirmManual = () => {
+    const num = parseFloat(manualValue);
+    if (!isNaN(num) && num >= 0) {
+      onChange(String(num));
+      onClose();
+    }
+  };
+
   const selectedValue = values[selectedIdx];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ paddingBottom: 16 }}>
-        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ position: 'relative', textAlign: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>
-            {selectedValue}{suffix && <span style={{ fontSize: 16, color: 'var(--text-muted)', marginLeft: 4 }}>{suffix}</span>}
-          </div>
-        </div>
-
-        <div style={{ position: 'relative', height: PICKER_HEIGHT, overflow: 'hidden' }}>
-          <div style={{
-            position: 'absolute', top: ITEM_HEIGHT * 2, left: 16, right: 16,
-            height: ITEM_HEIGHT, background: 'transparent',
-            borderRadius: 8, border: '2px solid var(--accent)',
-            pointerEvents: 'none', zIndex: 1,
-          }} />
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: ITEM_HEIGHT * 2, background: 'linear-gradient(var(--bg-card), transparent)', pointerEvents: 'none', zIndex: 2 }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ITEM_HEIGHT * 2, background: 'linear-gradient(transparent, var(--bg-card))', pointerEvents: 'none', zIndex: 2 }} />
-
-          <div
-            ref={scrollRef}
-            onScroll={handleScroll}
+          {!manualMode && (
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>
+              {selectedValue}{suffix && <span style={{ fontSize: 16, color: 'var(--text-muted)', marginLeft: 4 }}>{suffix}</span>}
+            </div>
+          )}
+          <button
+            onClick={() => { setManualMode(m => !m); setManualValue(''); }}
             style={{
-              height: PICKER_HEIGHT, overflowY: 'scroll',
-              scrollSnapType: 'y mandatory',
-              WebkitOverflowScrolling: 'touch',
+              position: 'absolute', top: 0, right: 0,
+              fontSize: 11, color: 'var(--text-muted)',
+              background: 'none', border: 'none', padding: '2px 4px',
+              cursor: 'pointer', textDecoration: 'underline',
             }}
           >
-            <div style={{ height: ITEM_HEIGHT * 2 }} />
-            {values.map((v, i) => {
-              const isSelected = i === selectedIdx;
-              return (
-                <div key={i} style={{
-                  height: ITEM_HEIGHT,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  scrollSnapAlign: 'start',
-                  fontSize: isSelected ? 20 : 16,
-                  fontWeight: isSelected ? 700 : 400,
-                  color: isSelected ? 'var(--text)' : 'var(--text-muted)',
-                }}>
-                  {v}
-                </div>
-              );
-            })}
-            <div style={{ height: ITEM_HEIGHT * 2 }} />
-          </div>
+            {manualMode ? 'scroll' : 'type'}
+          </button>
         </div>
+
+        {manualMode ? (
+          <div style={{ padding: '16px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                ref={manualInputRef}
+                type="number"
+                inputMode="decimal"
+                value={manualValue}
+                onChange={e => setManualValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') confirmManual(); }}
+                placeholder="e.g. 67.5"
+                style={{
+                  width: 120, fontSize: 24, fontWeight: 700, textAlign: 'center',
+                  background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  borderRadius: 8, color: 'var(--text)', padding: '8px 12px',
+                }}
+              />
+              {suffix && <span style={{ fontSize: 16, color: 'var(--text-muted)' }}>{suffix}</span>}
+            </div>
+          </div>
+        ) : (
+          <div style={{ position: 'relative', height: PICKER_HEIGHT, overflow: 'hidden' }}>
+            <div style={{
+              position: 'absolute', top: ITEM_HEIGHT * 2, left: 16, right: 16,
+              height: ITEM_HEIGHT, background: 'transparent',
+              borderRadius: 8, border: '2px solid var(--accent)',
+              pointerEvents: 'none', zIndex: 1,
+            }} />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: ITEM_HEIGHT * 2, background: 'linear-gradient(var(--bg-card), transparent)', pointerEvents: 'none', zIndex: 2 }} />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ITEM_HEIGHT * 2, background: 'linear-gradient(transparent, var(--bg-card))', pointerEvents: 'none', zIndex: 2 }} />
+
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              style={{
+                height: PICKER_HEIGHT, overflowY: 'scroll',
+                scrollSnapType: 'y mandatory',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              <div style={{ height: ITEM_HEIGHT * 2 }} />
+              {values.map((v, i) => {
+                const isSelected = i === selectedIdx;
+                return (
+                  <div key={i} style={{
+                    height: ITEM_HEIGHT,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    scrollSnapAlign: 'start',
+                    fontSize: isSelected ? 20 : 16,
+                    fontWeight: isSelected ? 700 : 400,
+                    color: isSelected ? 'var(--text)' : 'var(--text-muted)',
+                  }}>
+                    {v}
+                  </div>
+                );
+              })}
+              <div style={{ height: ITEM_HEIGHT * 2 }} />
+            </div>
+          </div>
+        )}
 
         <div className="modal-actions" style={{ marginTop: 12 }}>
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={confirm}>Set</button>
+          <button
+            className="btn btn-primary"
+            onClick={manualMode ? confirmManual : confirm}
+            disabled={manualMode && (isNaN(parseFloat(manualValue)) || parseFloat(manualValue) < 0)}
+          >
+            Set
+          </button>
         </div>
       </div>
     </div>

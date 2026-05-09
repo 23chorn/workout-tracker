@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Session } from '../db/database';
+import { db, type Session, type LiftingPlan } from '../db/database';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { Flame, Dumbbell, Target, TrendingUp, Trophy, Calendar } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
+import { getCurrentWeek, getPhaseForWeek, totalWeeks } from '../utils/plan';
 
 function getWeekKey(date: Date): string {
   const d = new Date(date);
@@ -106,6 +107,77 @@ function MuscleVolumeChart({ sessions }: { sessions: Session[] }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PlanProgressCard({ sessions }: { sessions: Session[] }) {
+  const activeProgress = useLiveQuery(() => db.liftingPlanProgress.filter(p => p.active).first()) ?? null;
+  const plan = useLiveQuery(
+    async () => {
+      if (!activeProgress) return null;
+      return (await db.liftingPlans.get(activeProgress.planId)) ?? null;
+    },
+    [activeProgress?.planId],
+  ) as LiftingPlan | null | undefined;
+  const exercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
+
+  if (!plan) return null;
+
+  const week = getCurrentWeek(plan);
+  const phase = getPhaseForWeek(plan, week);
+  const total = totalWeeks(plan);
+
+  // Current best e10RM per target exercise
+  const bestByEx = new Map<number, number>();
+  for (const s of sessions) {
+    for (const ex of s.exercises) {
+      const cur = bestByEx.get(ex.exerciseId) ?? 0;
+      if (ex.e10RM > cur) bestByEx.set(ex.exerciseId, ex.e10RM);
+    }
+  }
+
+  const exMap = new Map(exercises.map(e => [e.id!, e]));
+  const timeRatio = total > 0 ? week / total : 0;
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+        Plan Progress
+      </div>
+      <div className="title" style={{ fontSize: 15, marginBottom: 2 }}>
+        {plan.name}
+      </div>
+      <div className="subtitle" style={{ marginBottom: 12 }}>
+        {phase ? `${phase.name} · ` : ''}Week {week} of {total}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {plan.targets.map(t => {
+          const ex = exMap.get(t.exerciseId);
+          const current = bestByEx.get(t.exerciseId) ?? t.startWeight;
+          const span = t.targetWeight - t.startWeight;
+          const progressRatio = span > 0 ? Math.max(0, Math.min(1, (current - t.startWeight) / span)) : 0;
+          const onTrack = progressRatio >= timeRatio - 0.05;
+          return (
+            <div key={t.exerciseId}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                <span>{ex?.name ?? 'Unknown'}</span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {current.toFixed(1)} / {t.targetWeight} kg
+                </span>
+              </div>
+              <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${progressRatio * 100}%`,
+                  background: onTrack ? 'var(--accent)' : 'var(--yellow)',
+                  borderRadius: 4,
+                }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -280,6 +352,8 @@ export function StatsScreen() {
             <StatCard icon={Calendar} label="This Month" value={stats.thisMonth} sub="sessions" />
             <StatCard icon={TrendingUp} label="Avg / Week" value={stats.avgPerWeek.toFixed(1)} sub="sessions" />
           </div>
+
+          <PlanProgressCard sessions={sessions} />
 
           <WeeklyChart sessions={sessions} />
 
