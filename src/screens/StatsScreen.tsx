@@ -209,7 +209,7 @@ function PersonalBests({ sessions, onSelectExercise }: {
     }
     return [...map.entries()]
       .map(([id, data]) => ({ id, name: exMap.get(id)?.name ?? 'Unknown', ...data }))
-      .sort((a, b) => b.sessions - a.sessions || b.e10RM - a.e10RM)
+      .sort((a, b) => b.e10RM - a.e10RM)
       .slice(0, 10);
   }, [sessions, exMap]);
 

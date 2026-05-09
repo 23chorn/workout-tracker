@@ -205,7 +205,7 @@ interface ExerciseState {
   suggestionReason: string;
   repRange: [number, number];
   numSets: number;
-  lastSession?: { weight: number; reps: number[] };
+  lastSession?: { weight: number; reps: number[]; e10RM: number };
 }
 
 export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => void } = {}) {
@@ -371,7 +371,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
       const prevEx = prevSession?.exercises.find(e => e.exerciseId === we.exerciseId);
       const prevWorking = prevEx?.sets.filter(s => s.isWorkingSet) ?? [];
       const lastSession = prevWorking.length > 0
-        ? { weight: prevWorking[0].weight, reps: prevWorking.map(s => s.reps) }
+        ? { weight: prevWorking[0].weight, reps: prevWorking.map(s => s.reps), e10RM: prevEx?.e10RM ?? 0 }
         : undefined;
       states.push({
         exerciseId: we.exerciseId,
@@ -952,6 +952,11 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                 {es.lastSession && (
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                     Last: {es.lastSession.weight}kg &times; {es.lastSession.reps.join(', ')}
+                    {es.lastSession.e10RM > 0 && (
+                      <span style={{ marginLeft: 6, color: 'var(--accent)' }}>
+                        e10RM {es.lastSession.e10RM.toFixed(1)}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
