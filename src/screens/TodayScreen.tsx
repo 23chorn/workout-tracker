@@ -815,15 +815,17 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
         </div>
       </div>
 
-      {/* Sticky timer when inline is scrolled out of view */}
-      {timer.active && confirmedSets.size > 0 && (
+      {/* Fixed timer when inline is scrolled out of view — position:fixed keeps it out of document flow so it can't trigger IntersectionObserver feedback */}
+      {timer.active && confirmedSets.size > 0 && !inlineTimerVisible && (
         <div className="timer-bar" style={{
-          position: 'sticky',
-          top: 0,
+          position: 'fixed',
+          top: 'env(safe-area-inset-top, 0px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'calc(100% - 32px)',
+          maxWidth: 448,
           zIndex: 50,
-          opacity: inlineTimerVisible ? 0 : 1,
-          pointerEvents: inlineTimerVisible ? 'none' : 'auto',
-          transition: 'opacity 0.15s ease',
+          boxSizing: 'border-box',
         }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
