@@ -136,7 +136,7 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
                   <div key={i} style={{
                     height: ITEM_HEIGHT,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    scrollSnapAlign: 'start',
+                    scrollSnapAlign: 'center',
                     fontSize: isSelected ? 20 : 16,
                     fontWeight: isSelected ? 700 : 400,
                     color: isSelected ? 'var(--text)' : 'var(--text-muted)',

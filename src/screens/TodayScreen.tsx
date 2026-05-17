@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Exercise, type SessionSet, type SessionExercise, type ActiveSession, type LiftingPlan } from '../db/database';
 import { getSuggestion } from '../utils/progression';
 import { getTodayContext, skipDay, type TodayContext } from '../utils/plan';
-import { calcE10RM, sessionE10RM } from '../utils/e10rm';
+import { calcE10RM, calcE1RM, sessionE10RM, sessionE1RM } from '../utils/e10rm';
+import { useRMMode } from '../contexts/RMModeContext';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
 import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
@@ -209,6 +210,7 @@ interface ExerciseState {
 }
 
 export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => void } = {}) {
+  const { rmMode } = useRMMode();
   const programs = useLiveQuery(() => db.programs.toArray()) ?? [];
   const activePlanProgress = useLiveQuery(() => db.liftingPlanProgress.filter(p => p.active).first()) ?? null;
   const activePlan = useLiveQuery(
@@ -857,7 +859,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
         const filledSets = es.sets
           .filter(s => s.weight !== '' && s.reps !== '' && s.isWorkingSet)
           .map(s => ({ weight: parseFloat(s.weight), reps: parseInt(s.reps), isWorkingSet: true }));
-        const avgE10rm = sessionE10RM(filledSets);
+        const avgE10rm = rmMode === 'e10RM' ? sessionE10RM(filledSets) : sessionE1RM(filledSets);
 
         return (
           <div key={`${es.exerciseId}-${exIdx}`}>
@@ -908,7 +910,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{exercise.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {es.sets.filter((_, si) => confirmedSets.has(`${exIdx}-${si}`)).length}/{es.sets.length} sets
-                    {avgE10rm > 0 && <> &middot; e10RM: {avgE10rm.toFixed(1)} kg</>}
+                    {avgE10rm > 0 && <> &middot; {rmMode}: {avgE10rm.toFixed(1)} kg</>}
                   </div>
                 </div>
                 <ChevronDown size={16} color="var(--text-muted)" />
@@ -952,11 +954,15 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                 {es.lastSession && (
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                     Last: {es.lastSession.weight}kg &times; {es.lastSession.reps.join(', ')}
-                    {es.lastSession.e10RM > 0 && (
-                      <span style={{ marginLeft: 6, color: 'var(--accent)' }}>
-                        e10RM {es.lastSession.e10RM.toFixed(1)}
-                      </span>
-                    )}
+                    {es.lastSession.e10RM > 0 && (() => {
+                      const lastSets = es.lastSession!.reps.map(r => ({ weight: es.lastSession!.weight, reps: r, isWorkingSet: true }));
+                      const lastRMVal = rmMode === 'e10RM' ? sessionE10RM(lastSets) : sessionE1RM(lastSets);
+                      return lastRMVal > 0 ? (
+                        <span style={{ marginLeft: 6, color: 'var(--accent)' }}>
+                          {rmMode} {lastRMVal.toFixed(1)}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 )}
               </div>
@@ -1002,7 +1008,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
               <span>Set</span>
               <span>kg</span>
               <span>Reps</span>
-              <span>e10RM</span>
+              <span>{rmMode}</span>
               <span></span>
               <span>W</span>
             </div>
@@ -1010,7 +1016,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
             {es.sets.map((set, setIdx) => {
               const w = parseFloat(set.weight) || 0;
               const r = parseInt(set.reps) || 0;
-              const setE10rm = w > 0 && r > 0 ? calcE10RM(w, r) : 0;
+              const setE10rm = w > 0 && r > 0 ? (rmMode === 'e10RM' ? calcE10RM(w, r) : calcE1RM(w, r)) : 0;
               const isFilled = set.weight !== '' && set.reps !== '';
               const setKey = `${exIdx}-${setIdx}`;
               const isConfirmed = confirmedSets.has(setKey);
@@ -1125,7 +1131,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
 
             {avgE10rm > 0 && (
               <div className="e10rm">
-                Session e10RM: <span className="value">{avgE10rm.toFixed(1)} kg</span>
+                Session {rmMode}: <span className="value">{avgE10rm.toFixed(1)} kg</span>
               </div>
             )}
           </div>
