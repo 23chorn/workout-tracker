@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dumbbell, Clock, BarChart3, Layers, Settings, Waves } from 'lucide-react';
+import { RMModeProvider } from './contexts/RMModeContext';
 import { TodayScreen } from './screens/TodayScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { StatsScreen } from './screens/StatsScreen';
@@ -30,6 +31,7 @@ export function App() {
   ];
 
   return (
+    <RMModeProvider>
     <div className="app">
       {tab === 'lift' && <TodayScreen onNavigateRowing={rowingEnabled ? () => setTab('rowing') : undefined} />}
       {tab === 'rowing' && rowingEnabled && <RowingScreen />}
@@ -56,5 +58,6 @@ export function App() {
         </div>
       </nav>
     </div>
+    </RMModeProvider>
   );
 }

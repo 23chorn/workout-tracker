@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
+import { useRMMode } from '../contexts/RMModeContext';
+import { loadCompoundGoals, saveCompoundGoals, COMPOUND_DEFS, type CompoundGoals } from '../utils/compoundGoals';
 import { seedStrengthPlan } from '../db/strengthPlan';
 import { exportData, importData } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
@@ -66,16 +68,20 @@ function HelpContent() {
         </div>
       </div>
 
-      <h2 style={{ marginTop: 24 }}>e10RM</h2>
+      <h2 style={{ marginTop: 24 }}>Strength Metrics</h2>
       <div className="card">
-        <p style={{ fontSize: 13, lineHeight: 1.6 }}><strong>Estimated 10-rep max</strong> — a normalised strength metric.</p>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.6 }}>Per set: weight × (1 + reps / 30) / 1.333</p>
+        <p style={{ fontSize: 13, lineHeight: 1.6 }}><strong>e1RM</strong> — estimated 1-rep max. The classic strength standard.</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>weight × (1 + reps / 30)</p>
+        <p style={{ fontSize: 13, lineHeight: 1.6, marginTop: 12 }}><strong>e10RM</strong> — estimated 10-rep max. Scaled down from e1RM; useful for tracking hypertrophy-range work.</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>weight × (1 + reps / 30) / 1.333</p>
       </div>
     </>
   );
 }
 
 export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void }) {
+  const { rmMode, setRMMode } = useRMMode();
+  const [goals, setGoals] = useState<CompoundGoals>(loadCompoundGoals);
   const [demo] = useState(isDemoMode);
   const [demoLoading, setDemoLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -158,6 +164,56 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
         <button className="btn btn-secondary btn-full" onClick={() => setShowHelp(true)}>
           Help &amp; Guide
         </button>
+      </div>
+
+      {/* Display */}
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 16 }}>Display</h2>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Strength Metric</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Charts and personal bests</div>
+          </div>
+          <div className="sub-tabs" style={{ marginBottom: 0 }}>
+            <button className={`sub-tab ${rmMode === 'e10RM' ? 'active' : ''}`} onClick={() => setRMMode('e10RM')}>e10RM</button>
+            <button className={`sub-tab ${rmMode === 'e1RM' ? 'active' : ''}`} onClick={() => setRMMode('e1RM')}>e1RM</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Compound Goals */}
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 16 }}>Compound Goals</h2>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+          Target {rmMode} as a % of bodyweight. E.g. 120 = 1.2× BW. Shown in Stats.
+        </p>
+        {COMPOUND_DEFS.map(({ key, label }) => (
+          <div key={key} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={500}
+                value={goals[key] ?? ''}
+                onChange={e => {
+                  const raw = e.target.value;
+                  const updated: CompoundGoals = { ...goals, [key]: raw === '' ? null : Number(raw) };
+                  setGoals(updated);
+                  saveCompoundGoals(updated);
+                }}
+                placeholder="—"
+                style={{
+                  width: 64, textAlign: 'right', padding: '4px 8px', fontSize: 14,
+                  background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  borderRadius: 6, color: 'var(--text)',
+                }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', width: 32 }}>% BW</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Lifting Plan */}

@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SessionSet } from '../db/database';
-import { calcE10RM } from '../utils/e10rm';
+import { calcE10RM, calcE1RM, sessionE10RM, sessionE1RM } from '../utils/e10rm';
+import { useRMMode } from '../contexts/RMModeContext';
 import { ChevronLeft, ChevronDown, Pencil } from 'lucide-react';
 
 type TimePeriod = '3m' | '6m' | '1y' | 'all';
@@ -26,16 +27,20 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
   const sessions = useLiveQuery(() => db.sessions.orderBy('date').reverse().toArray()) ?? [];
   const exercise = useLiveQuery(() => db.exercises.get(exerciseId));
   const [period, setPeriod] = useState<TimePeriod>('3m');
+  const { rmMode } = useRMMode();
 
-  const bestE10RM = useMemo(() => {
+  const bestValue = useMemo(() => {
     let best = 0;
     for (const s of sessions) {
       for (const ex of s.exercises) {
-        if (ex.exerciseId === exerciseId && ex.e10RM > best) best = ex.e10RM;
+        if (ex.exerciseId === exerciseId) {
+          const val = rmMode === 'e10RM' ? sessionE10RM(ex.sets) : sessionE1RM(ex.sets);
+          if (val > best) best = val;
+        }
       }
     }
     return best;
-  }, [sessions, exerciseId]);
+  }, [sessions, exerciseId, rmMode]);
 
   const dataPoints = useMemo(() => {
     const cutoff = periodCutoff(period);
@@ -44,7 +49,12 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
       .filter(s => !cutoff || new Date(s.date) >= cutoff)
       .map(s => {
         const ex = s.exercises.find(e => e.exerciseId === exerciseId)!;
-        return { date: new Date(s.date), e10RM: ex.e10RM, sets: ex.sets };
+        return {
+          date: new Date(s.date),
+          e10RM: sessionE10RM(ex.sets),
+          e1RM: sessionE1RM(ex.sets),
+          sets: ex.sets,
+        };
       })
       .filter(d => d.e10RM > 0)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -61,15 +71,16 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
   const padT = 16;
   const padB = 28;
 
-  const maxVal = dataPoints.length > 0 ? Math.max(...dataPoints.map(d => d.e10RM)) : 0;
-  const minVal = dataPoints.length > 0 ? Math.min(...dataPoints.map(d => d.e10RM)) : 0;
+  const vals = dataPoints.map(d => d[rmMode]);
+  const maxVal = vals.length > 0 ? Math.max(...vals) : 0;
+  const minVal = vals.length > 0 ? Math.min(...vals) : 0;
   const range = maxVal - minVal || 1;
 
   const points = dataPoints.map((d, i) => {
     const x = dataPoints.length === 1
       ? (padL + w - padR) / 2
       : padL + (i / (dataPoints.length - 1)) * (w - padL - padR);
-    const y = padT + (1 - (d.e10RM - minVal) / range) * (h - padT - padB);
+    const y = padT + (1 - (d[rmMode] - minVal) / range) * (h - padT - padB);
     return { x, y, ...d };
   });
 
@@ -102,14 +113,14 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
       <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
         {exercise.category && <span style={{ textTransform: 'capitalize' }}>{exercise.category} &middot; </span>}
         {exercise.muscleGroup}{exercise.secondaryMuscleGroup && ` / ${exercise.secondaryMuscleGroup}`} &middot; {exercise.defaultRestSeconds}s
-        {bestE10RM > 0 && (
-          <> &middot; PB: <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>{bestE10RM.toFixed(1)} kg</span></>
+        {bestValue > 0 && (
+          <> &middot; PB: <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>{bestValue.toFixed(1)} kg</span> <span style={{ opacity: 0.6 }}>({rmMode})</span></>
         )}
       </div>
 
       {children}
 
-      {bestE10RM > 0 && (
+      {bestValue > 0 && (
         <>
           <div className="sub-tabs" style={{ marginBottom: 16 }}>
             {(['3m', '6m', '1y', 'all'] as TimePeriod[]).map(p => (
@@ -129,7 +140,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
             </div>
           ) : (
             <div className="chart">
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>e10RM over time</div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{rmMode} over time</div>
               <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto' }}>
                 {gridLines.map((g, i) => (
                   <g key={i}>
@@ -155,7 +166,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
                   </>
                 )}
                 {(() => {
-                  const bestY = padT + (1 - (bestE10RM - minVal) / range) * (h - padT - padB);
+                  const bestY = padT + (1 - (bestValue - minVal) / range) * (h - padT - padB);
                   return (
                     <line x1={padL} y1={bestY} x2={w - padR} y2={bestY}
                       stroke="var(--yellow)" strokeWidth="1" strokeDasharray="4 3" opacity="0.6" />
@@ -175,6 +186,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
           <h2 style={{ marginTop: 20, marginBottom: 4 }}>Recent Sessions</h2>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Tap for set details</div>
           {dataPoints.slice().reverse().slice(0, 10).map((dp, i) => {
+            const dpVal = dp[rmMode];
             const isExpanded = expandedSession === i;
             return (
               <div key={i} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 8 }}>
@@ -193,10 +205,10 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
                   </div>
                   <span style={{
                     fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                    color: dp.e10RM >= bestE10RM ? 'var(--yellow)' : 'var(--accent)',
+                    color: dpVal >= bestValue ? 'var(--yellow)' : 'var(--accent)',
                   }}>
-                    {dp.e10RM.toFixed(1)} kg
-                    {dp.e10RM >= bestE10RM && <span className="pb-badge" style={{ marginLeft: 6, fontSize: 10 }}>PB</span>}
+                    {dpVal.toFixed(1)} kg
+                    {dpVal >= bestValue && <span className="pb-badge" style={{ marginLeft: 6, fontSize: 10 }}>PB</span>}
                   </span>
                 </button>
                 {isExpanded && (
@@ -205,18 +217,20 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
                       <span>Set</span>
                       <span>kg</span>
                       <span>Reps</span>
-                      <span>e10RM</span>
+                      <span>{rmMode}</span>
                       <span>Type</span>
                     </div>
                     {dp.sets.map((set: SessionSet, si: number) => {
-                      const setE10rm = set.weight > 0 && set.reps > 0 ? calcE10RM(set.weight, set.reps) : 0;
+                      const setVal = set.weight > 0 && set.reps > 0
+                        ? (rmMode === 'e10RM' ? calcE10RM(set.weight, set.reps) : calcE1RM(set.weight, set.reps))
+                        : 0;
                       return (
                         <div key={si} className="set-row" style={{ gridTemplateColumns: '32px 1fr 1fr 50px 40px', marginBottom: 4 }}>
                           <span className="set-num">{si + 1}</span>
                           <span style={{ textAlign: 'center' }}>{set.weight}</span>
                           <span style={{ textAlign: 'center' }}>{set.reps}</span>
                           <span style={{ textAlign: 'center', fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-                            {setE10rm > 0 ? setE10rm.toFixed(0) : '—'}
+                            {setVal > 0 ? setVal.toFixed(0) : '—'}
                           </span>
                           <span style={{ textAlign: 'center', fontSize: 11, color: set.isWorkingSet ? 'var(--accent)' : 'var(--text-muted)' }}>
                             {set.isWorkingSet ? 'W' : 'WU'}
@@ -232,7 +246,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
         </>
       )}
 
-      {bestE10RM === 0 && (
+      {bestValue === 0 && (
         <div className="empty" style={{ padding: 24 }}>
           <p>No session data yet for this exercise.</p>
         </div>

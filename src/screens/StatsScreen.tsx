@@ -1,6 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Session, type LiftingPlan } from '../db/database';
+import { sessionE10RM, sessionE1RM } from '../utils/e10rm';
+import { useRMMode } from '../contexts/RMModeContext';
+import { loadCompoundGoals, COMPOUND_DEFS, type CompoundGoalKey } from '../utils/compoundGoals';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { Flame, Dumbbell, Target, TrendingUp, Trophy, Calendar } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
@@ -183,25 +186,108 @@ function PlanProgressCard({ sessions }: { sessions: Session[] }) {
   );
 }
 
+function CompoundGoalsCard({ sessions }: { sessions: Session[] }) {
+  const { rmMode } = useRMMode();
+  const allExercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
+  const latestBWEntry = useLiveQuery(() => db.bodyWeight.orderBy('date').reverse().first()) ?? null;
+  const goals = loadCompoundGoals();
+
+  const exIdByKey = useMemo(() => {
+    const map = new Map<CompoundGoalKey, number>();
+    for (const c of COMPOUND_DEFS) {
+      const ex = allExercises.find(e => c.exactNames.includes(e.name.toLowerCase()));
+      if (ex?.id != null) map.set(c.key, ex.id);
+    }
+    return map;
+  }, [allExercises]);
+
+  const bestByEx = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of sessions) {
+      for (const ex of s.exercises) {
+        const val = rmMode === 'e10RM' ? sessionE10RM(ex.sets) : sessionE1RM(ex.sets);
+        const cur = map.get(ex.exerciseId) ?? 0;
+        if (val > cur) map.set(ex.exerciseId, val);
+      }
+    }
+    return map;
+  }, [sessions, rmMode]);
+
+  const hasAnyGoal = COMPOUND_DEFS.some(c => (goals[c.key] ?? 0) > 0);
+  if (!hasAnyGoal) return null;
+
+  const bw = latestBWEntry?.weight ?? null;
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+        Compound Goals · {rmMode}
+      </div>
+      {bw == null && (
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+          Add your bodyweight in Settings to see goal progress.
+        </p>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {COMPOUND_DEFS.map(c => {
+          const percent = goals[c.key];
+          if (percent == null || percent <= 0) return null;
+          const target = bw != null ? (bw * percent) / 100 : null;
+          const exId = exIdByKey.get(c.key);
+          const current = exId != null ? (bestByEx.get(exId) ?? 0) : 0;
+          const ratio = target != null && target > 0 ? Math.min(1, current / target) : 0;
+          const achieved = ratio >= 1;
+          return (
+            <div key={c.key}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600 }}>{c.label}</span>
+                <span style={{ color: achieved ? 'var(--yellow)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                  {current > 0 ? current.toFixed(1) : '—'} / {target != null ? target.toFixed(1) : '?'} kg
+                  {achieved && <span style={{ marginLeft: 4, fontWeight: 700 }}>✓</span>}
+                </span>
+              </div>
+              <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${ratio * 100}%`,
+                  background: achieved ? 'var(--yellow)' : 'var(--accent)',
+                  borderRadius: 4,
+                }} />
+              </div>
+              {target != null && (
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {(ratio * 100).toFixed(0)}% · target ×{(percent / 100).toFixed(2)} BW
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PersonalBests({ sessions, onSelectExercise }: {
   sessions: Session[];
   onSelectExercise: (id: number, name: string, best: number) => void;
 }) {
   const allExercises = useLiveQuery(() => db.exercises.toArray()) ?? [];
   const exMap = new Map(allExercises.map(e => [e.id!, e]));
+  const { rmMode } = useRMMode();
 
   const bests = useMemo(() => {
-    const map = new Map<number, { e10RM: number; date: string; sessions: number }>();
+    const map = new Map<number, { value: number; date: string; sessions: number }>();
     for (const s of sessions) {
       for (const ex of s.exercises) {
-        if (ex.e10RM <= 0) continue;
+        const val = rmMode === 'e10RM' ? sessionE10RM(ex.sets) : sessionE1RM(ex.sets);
+        if (val <= 0) continue;
         const current = map.get(ex.exerciseId);
         if (!current) {
-          map.set(ex.exerciseId, { e10RM: ex.e10RM, date: s.date, sessions: 1 });
+          map.set(ex.exerciseId, { value: val, date: s.date, sessions: 1 });
         } else {
           current.sessions++;
-          if (ex.e10RM > current.e10RM) {
-            current.e10RM = ex.e10RM;
+          if (val > current.value) {
+            current.value = val;
             current.date = s.date;
           }
         }
@@ -209,23 +295,23 @@ function PersonalBests({ sessions, onSelectExercise }: {
     }
     return [...map.entries()]
       .map(([id, data]) => ({ id, name: exMap.get(id)?.name ?? 'Unknown', ...data }))
-      .sort((a, b) => b.e10RM - a.e10RM)
+      .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [sessions, exMap]);
+  }, [sessions, exMap, rmMode]);
 
   if (bests.length === 0) return null;
 
   return (
     <div>
       <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Trophy size={18} color="var(--yellow)" /> Personal Bests (e10RM)
+        <Trophy size={18} color="var(--yellow)" /> Personal Bests ({rmMode})
       </h2>
       {bests.map((pb, i) => (
         <button
           key={i}
           className="list-item"
           style={{ width: '100%' }}
-          onClick={() => onSelectExercise(pb.id, pb.name, pb.e10RM)}
+          onClick={() => onSelectExercise(pb.id, pb.name, pb.value)}
         >
           <div style={{ textAlign: 'left' }}>
             <div className="title">{pb.name}</div>
@@ -234,7 +320,7 @@ function PersonalBests({ sessions, onSelectExercise }: {
             </div>
           </div>
           <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
-            {pb.e10RM.toFixed(1)}
+            {pb.value.toFixed(1)}
           </span>
         </button>
       ))}
@@ -362,6 +448,7 @@ export function StatsScreen() {
           </div>
 
           <div style={{ marginTop: 16 }}>
+            <CompoundGoalsCard sessions={sessions} />
             <PersonalBests
               sessions={sessions}
               onSelectExercise={(id, name, best) => setSelectedExercise({ id, name, best })}
