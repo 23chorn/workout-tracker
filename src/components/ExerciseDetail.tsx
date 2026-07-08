@@ -141,7 +141,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
           ) : (
             <div className="chart">
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{rmMode} over time</div>
-              <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto' }}>
+              <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', aspectRatio: `${w} / ${h}`, display: 'block' }}>
                 {gridLines.map((g, i) => (
                   <g key={i}>
                     <line x1={padL} y1={g.y} x2={w - padR} y2={g.y} stroke="var(--border)" strokeWidth="0.75" strokeDasharray="1 4" />

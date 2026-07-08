@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
 import { ScrollPicker, weightValues, dumbbellWeightValues, bodyweightWeightValues, repValues } from '../components/ScrollPicker';
+import { BackupReminder } from '../components/BackupReminder';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -723,6 +724,8 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
     return (
       <div className="screen">
         <h1>Today</h1>
+
+        <BackupReminder />
 
         {planContext ? (
           <PlanTodayCard

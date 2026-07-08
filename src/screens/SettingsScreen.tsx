@@ -4,7 +4,7 @@ import { db } from '../db/database';
 import { useRMMode } from '../contexts/RMModeContext';
 import { loadCompoundGoals, saveCompoundGoals, COMPOUND_DEFS, type CompoundGoals } from '../utils/compoundGoals';
 import { seedStrengthPlan } from '../db/strengthPlan';
-import { exportData, importData } from '../utils/backup';
+import { exportData, importData, getLastBackupDate } from '../utils/backup';
 import { isDemoMode, enableDemo, disableDemo } from '../db/demo';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { BodyWeightTracker } from '../components/BodyWeightTracker';
@@ -88,6 +88,7 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
   const fileRef = useRef<HTMLInputElement>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importSuccess, setImportSuccess] = useState<boolean | null>(null);
+  const [lastBackup, setLastBackup] = useState(getLastBackupDate);
   const [rowingEnabled, setRowingEnabled] = useState(localStorage.getItem('lift-rowing-enabled') === '1');
   const plans = useLiveQuery(() => db.liftingPlans.toArray()) ?? [];
   const activeProgress = useLiveQuery(() => db.liftingPlanProgress.filter(p => p.active).first()) ?? null;
@@ -147,8 +148,21 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
       {/* Data */}
       <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
         <h2 style={{ fontSize: 16 }}>Data</h2>
+        {(() => {
+          const daysSince = lastBackup ? Math.floor((Date.now() - lastBackup.getTime()) / 86400000) : null;
+          const stale = daysSince === null || daysSince >= 14;
+          return (
+            <p style={{ fontSize: 12, color: stale ? 'var(--yellow)' : 'var(--text-muted)', marginBottom: 10 }}>
+              {daysSince === null ? 'No backup yet' : daysSince === 0 ? 'Backed up today' : `Last backup: ${daysSince} day${daysSince === 1 ? '' : 's'} ago`}
+            </p>
+          );
+        })()}
         <div className="row gap-sm mb-md">
-          <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={exportData}>
+          <button
+            className="btn btn-sm btn-secondary"
+            style={{ flex: 1 }}
+            onClick={async () => { await exportData(); setLastBackup(getLastBackupDate()); }}
+          >
             <Download size={14} /> Export
           </button>
           <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={() => fileRef.current?.click()}>
@@ -156,7 +170,7 @@ export function SettingsScreen({ onRowingToggle }: { onRowingToggle?: () => void
           </button>
           <input ref={fileRef} type="file" accept=".json" onChange={handleImportSelect} style={{ display: 'none' }} />
         </div>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>All data stored locally. Nothing sent to a server.</p>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>All data stored locally. Nothing sent to a server. iOS can clear this data unexpectedly — back up regularly.</p>
       </div>
 
       {/* Help */}

@@ -1,5 +1,12 @@
 import { db } from '../db/database';
 
+const LAST_BACKUP_KEY = 'lift-last-backup';
+
+export function getLastBackupDate(): Date | null {
+  const v = localStorage.getItem(LAST_BACKUP_KEY);
+  return v ? new Date(v) : null;
+}
+
 export async function exportData(): Promise<void> {
   const [exercises, workouts, programs, sessions, rowingPrograms, rowingProgress, rowingSessions, bodyWeight, liftingPlans, liftingPlanProgress] = await Promise.all([
     db.exercises.toArray(), db.workouts.toArray(), db.programs.toArray(), db.sessions.toArray(),
@@ -15,6 +22,7 @@ export async function exportData(): Promise<void> {
   a.download = `lift-backup-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
 }
 
 export async function importData(file: File): Promise<void> {
