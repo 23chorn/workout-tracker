@@ -462,6 +462,20 @@ select {
   padding: 14px 16px 16px;
 }
 
+/* Receipt line items — dashed, like the tear line above them */
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px dashed var(--border);
+}
+
+.receipt-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
 /* Timer — reads like a plate-loading display, not a chat-app card */
 .timer-bar {
   background: var(--bg-card);

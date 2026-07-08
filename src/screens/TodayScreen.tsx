@@ -7,7 +7,7 @@ import { calcE10RM, calcE1RM, sessionE10RM, sessionE1RM } from '../utils/e10rm';
 import { useRMMode } from '../contexts/RMModeContext';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
-import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2, Notebook } from 'lucide-react';
+import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2, Notebook, History } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
@@ -1023,13 +1023,16 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                   )}
                 </div>
                 {es.lastSession && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                    Last: {es.lastSession.weight}kg &times; {es.lastSession.reps.join(', ')}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                    <History size={11} style={{ flexShrink: 0 }} />
+                    <span>Last time</span>
+                    <span className="num" style={{ color: 'var(--text)', fontWeight: 600 }}>{es.lastSession.weight}kg</span>
+                    <span className="num">× {es.lastSession.reps.join('·')}</span>
                     {es.lastSession.e10RM > 0 && (() => {
                       const lastSets = es.lastSession!.reps.map(r => ({ weight: es.lastSession!.weight, reps: r, isWorkingSet: true }));
                       const lastRMVal = rmMode === 'e10RM' ? sessionE10RM(lastSets) : sessionE1RM(lastSets);
                       return lastRMVal > 0 ? (
-                        <span style={{ marginLeft: 6, color: 'var(--accent)' }}>
+                        <span className="num" style={{ color: 'var(--accent)' }}>
                           {rmMode} {lastRMVal.toFixed(1)}
                         </span>
                       ) : null;
@@ -1037,30 +1040,39 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <button
-                    className="btn btn-sm"
-                    style={{ padding: '2px 4px', minHeight: 0, opacity: exIdx === 0 ? 0.3 : 1 }}
+                    style={{
+                      width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)',
+                      opacity: exIdx === 0 ? 0.3 : 1,
+                    }}
                     onClick={() => moveExercise(exIdx, -1)}
                     disabled={exIdx === 0}
                     aria-label="Move up"
                   >
-                    <ChevronUp size={16} />
+                    <ChevronUp size={18} color="var(--text-muted)" />
                   </button>
                   <button
-                    className="btn btn-sm"
-                    style={{ padding: '2px 4px', minHeight: 0, opacity: exIdx === exerciseStates.length - 1 ? 0.3 : 1 }}
+                    style={{
+                      width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)',
+                      opacity: exIdx === exerciseStates.length - 1 ? 0.3 : 1,
+                    }}
                     onClick={() => moveExercise(exIdx, 1)}
                     disabled={exIdx === exerciseStates.length - 1}
                     aria-label="Move down"
                   >
-                    <ChevronDown size={16} />
+                    <ChevronDown size={18} color="var(--text-muted)" />
                   </button>
                 </div>
                 <button
-                  className="btn btn-sm"
-                  style={{ padding: '4px', minHeight: 0, color: 'var(--red)' }}
+                  style={{
+                    width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)',
+                    color: 'var(--red)', marginLeft: 4,
+                  }}
                   onClick={() => {
                     setConfirmAction({
                       title: 'Remove Exercise',
@@ -1070,7 +1082,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                   }}
                   aria-label="Remove exercise"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={15} />
                 </button>
               </div>
             </div>
