@@ -5,7 +5,7 @@ import { db, type Workout, type WorkoutExercise } from '../../db/database';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ExercisePicker } from '../ExercisePicker';
 import { ScrollPicker } from '../ScrollPicker';
-import { Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, X, ChevronUp, ChevronDown, Dumbbell } from 'lucide-react';
 
 type PickerField = 'sets' | 'repMin' | 'repMax' | 'restSeconds';
 
@@ -199,7 +199,11 @@ export function WorkoutManager() {
         <button className="btn btn-sm btn-primary" onClick={startNew}><Plus size={16} /> New</button>
       </div>
       {workouts.length === 0 ? (
-        <div className="empty"><p>No workouts yet.</p></div>
+        <div className="empty">
+          <Dumbbell size={28} />
+          <div className="empty-title">No workouts yet</div>
+          <p>Add one to start building programs.</p>
+        </div>
       ) : (
         workouts.map(w => (
           <div key={w.id} className="list-item" onClick={() => startEdit(w)}>

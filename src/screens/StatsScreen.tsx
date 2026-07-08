@@ -319,7 +319,7 @@ function PersonalBests({ sessions, onSelectExercise }: {
               {new Date(pb.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
           </div>
-          <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+          <span className="num" style={{ fontSize: 18, fontWeight: 600, color: 'var(--accent)' }}>
             {pb.value.toFixed(1)}
           </span>
         </button>
@@ -418,7 +418,9 @@ export function StatsScreen() {
 
       {sessions.length === 0 ? (
         <div className="empty">
-          <p>Complete your first workout to see stats.</p>
+          <TrendingUp size={28} />
+          <div className="empty-title">No numbers yet</div>
+          <p>Finish a workout and your stats start here.</p>
         </div>
       ) : (
         <>

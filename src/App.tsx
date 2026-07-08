@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dumbbell, Clock, BarChart3, Layers, Settings, Waves } from 'lucide-react';
+import { Dumbbell, History, TrendingUp, Notebook, Settings, Waves } from 'lucide-react';
 import { RMModeProvider } from './contexts/RMModeContext';
 import { TodayScreen } from './screens/TodayScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
@@ -24,9 +24,9 @@ export function App() {
   const tabs: { id: TabId; icon: typeof Dumbbell; label: string }[] = [
     { id: 'lift', icon: Dumbbell, label: 'Lift' },
     ...(rowingEnabled ? [{ id: 'rowing' as TabId, icon: Waves, label: 'Row' }] : []),
-    { id: 'history', icon: Clock, label: 'History' },
-    { id: 'stats', icon: BarChart3, label: 'Stats' },
-    { id: 'manage', icon: Layers, label: 'Manage' },
+    { id: 'history', icon: History, label: 'History' },
+    { id: 'stats', icon: TrendingUp, label: 'Stats' },
+    { id: 'manage', icon: Notebook, label: 'Manage' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 

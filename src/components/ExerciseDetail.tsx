@@ -114,7 +114,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
         {exercise.category && <span style={{ textTransform: 'capitalize' }}>{exercise.category} &middot; </span>}
         {exercise.muscleGroup}{exercise.secondaryMuscleGroup && ` / ${exercise.secondaryMuscleGroup}`} &middot; {exercise.defaultRestSeconds}s
         {bestValue > 0 && (
-          <> &middot; PB: <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>{bestValue.toFixed(1)} kg</span> <span style={{ opacity: 0.6 }}>({rmMode})</span></>
+          <> &middot; PB: <span className="num" style={{ color: 'var(--yellow)', fontWeight: 600 }}>{bestValue.toFixed(1)} kg</span> <span style={{ opacity: 0.6 }}>({rmMode})</span></>
         )}
       </div>
 
@@ -136,7 +136,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
 
           {dataPoints.length === 0 ? (
             <div className="empty" style={{ padding: 24 }}>
-              <p>No data for this period.</p>
+              <p>Nothing in this window. Try a longer range.</p>
             </div>
           ) : (
             <div className="chart">
@@ -144,8 +144,8 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
               <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto' }}>
                 {gridLines.map((g, i) => (
                   <g key={i}>
-                    <line x1={padL} y1={g.y} x2={w - padR} y2={g.y} stroke="var(--border)" strokeWidth="0.5" />
-                    <text x={padL - 4} y={g.y + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end">
+                    <line x1={padL} y1={g.y} x2={w - padR} y2={g.y} stroke="var(--border)" strokeWidth="0.75" strokeDasharray="1 4" />
+                    <text className="num" x={padL - 4} y={g.y + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end">
                       {g.val.toFixed(1)}
                     </text>
                   </g>
@@ -157,10 +157,10 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
                 ))}
                 {points.length >= 2 && (
                   <>
-                    <text x={points[0].x} y={h - 4} fill="var(--text-muted)" fontSize="9" textAnchor="start">
+                    <text className="num" x={points[0].x} y={h - 4} fill="var(--text-muted)" fontSize="9" textAnchor="start">
                       {points[0].date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </text>
-                    <text x={points[points.length - 1].x} y={h - 4} fill="var(--text-muted)" fontSize="9" textAnchor="end">
+                    <text className="num" x={points[points.length - 1].x} y={h - 4} fill="var(--text-muted)" fontSize="9" textAnchor="end">
                       {points[points.length - 1].date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </text>
                   </>
@@ -203,8 +203,8 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
                       {dp.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
                   </div>
-                  <span style={{
-                    fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                  <span className="num" style={{
+                    fontSize: 16, fontWeight: 600,
                     color: dpVal >= bestValue ? 'var(--yellow)' : 'var(--accent)',
                   }}>
                     {dpVal.toFixed(1)} kg
@@ -227,9 +227,9 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
                       return (
                         <div key={si} className="set-row" style={{ gridTemplateColumns: '32px 1fr 1fr 50px 40px', marginBottom: 4 }}>
                           <span className="set-num">{si + 1}</span>
-                          <span style={{ textAlign: 'center' }}>{set.weight}</span>
-                          <span style={{ textAlign: 'center' }}>{set.reps}</span>
-                          <span style={{ textAlign: 'center', fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
+                          <span className="num" style={{ textAlign: 'center' }}>{set.weight}</span>
+                          <span className="num" style={{ textAlign: 'center' }}>{set.reps}</span>
+                          <span className="num" style={{ textAlign: 'center', fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
                             {setVal > 0 ? setVal.toFixed(0) : '—'}
                           </span>
                           <span style={{ textAlign: 'center', fontSize: 11, color: set.isWorkingSet ? 'var(--accent)' : 'var(--text-muted)' }}>
@@ -248,7 +248,7 @@ export function ExerciseDetail({ exerciseId, backLabel, onBack, onEdit, children
 
       {bestValue === 0 && (
         <div className="empty" style={{ padding: 24 }}>
-          <p>No session data yet for this exercise.</p>
+          <p>Never logged. Do a set and it'll start tracking here.</p>
         </div>
       )}
     </div>

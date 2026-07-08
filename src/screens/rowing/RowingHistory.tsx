@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { type RowingSession } from '../../db/database';
 import { formatSplit, formatMinSec } from '../../utils/date';
-import { ChevronDown, Trophy } from 'lucide-react';
+import { ChevronDown, Trophy, Waves } from 'lucide-react';
 
 function getWeekKey(date: Date): string {
   const d = new Date(date);
@@ -163,7 +163,7 @@ function PersonalBests({ sessions }: { sessions: RowingSession[] }) {
             <div className="title">{pb.label}</div>
             <div className="subtitle">{new Date(pb.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>
           </div>
-          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+          <span className="num" style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>
             {pb.value}
           </span>
         </div>
@@ -185,7 +185,11 @@ export function RowingHistory({ sessions }: { sessions: RowingSession[] }) {
 
       <h2 style={{ marginTop: 16 }}>Sessions</h2>
       {sessions.length === 0 ? (
-        <div className="empty"><p>No rowing sessions yet.</p></div>
+        <div className="empty">
+          <Waves size={28} />
+          <div className="empty-title">No rows logged yet</div>
+          <p>Log one from the Row tab.</p>
+        </div>
       ) : (
         sessions.map((s, i) => (
           <div key={s.id} className="card" style={{ padding: 0, marginBottom: 8, overflow: 'hidden' }}>

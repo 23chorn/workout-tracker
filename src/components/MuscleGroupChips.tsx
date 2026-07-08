@@ -10,7 +10,8 @@ export function MuscleGroupChips({ groups, selected, onSelect }: {
           key={mg}
           onClick={() => onSelect(selected === mg ? null : mg)}
           style={{
-            padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+            padding: '4px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+            fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.03em',
             border: '1px solid var(--border)',
             background: selected === mg ? 'var(--accent)' : 'var(--bg-input)',
             color: selected === mg ? 'white' : 'var(--text-muted)',

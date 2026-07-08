@@ -6,61 +6,61 @@ function drawIcon(size) {
   const ctx = canvas.getContext('2d');
   const s = size / 512; // scale factor
 
-  // Background
-  ctx.fillStyle = '#0a0a0a';
+  // Background — rubber-floor black
+  ctx.fillStyle = '#14120f';
   ctx.beginPath();
   ctx.roundRect(0, 0, size, size, 64 * s);
   ctx.fill();
 
-  // Barbell
+  // Barbell — tempered steel
   const cy = 220 * s;
   const barY = cy - 8 * s;
   const barH = 16 * s;
 
   // Bar
-  ctx.fillStyle = '#6366f1';
+  ctx.fillStyle = '#5b8a99';
   ctx.fillRect(74 * s, barY, 364 * s, barH);
 
   // Left plates — inner (big) then outer (small)
   // Inner plate (big, next to collar)
-  ctx.fillStyle = '#6366f1';
+  ctx.fillStyle = '#5b8a99';
   ctx.beginPath();
   ctx.roundRect(108 * s, cy - 70 * s, 32 * s, 140 * s, 6 * s);
   ctx.fill();
   // Outer plate (small, near end)
-  ctx.fillStyle = '#818cf8';
+  ctx.fillStyle = '#7fa8b5';
   ctx.beginPath();
   ctx.roundRect(74 * s, cy - 50 * s, 28 * s, 100 * s, 6 * s);
   ctx.fill();
 
   // Right plates — inner (big) then outer (small)
   // Inner plate (big, next to collar)
-  ctx.fillStyle = '#6366f1';
+  ctx.fillStyle = '#5b8a99';
   ctx.beginPath();
   ctx.roundRect(372 * s, cy - 70 * s, 32 * s, 140 * s, 6 * s);
   ctx.fill();
   // Outer plate (small, near end)
-  ctx.fillStyle = '#818cf8';
+  ctx.fillStyle = '#7fa8b5';
   ctx.beginPath();
   ctx.roundRect(410 * s, cy - 50 * s, 28 * s, 100 * s, 6 * s);
   ctx.fill();
 
   // Left collar
-  ctx.fillStyle = '#4f46e5';
+  ctx.fillStyle = '#3f6570';
   ctx.fillRect(148 * s, cy - 16 * s, 16 * s, 32 * s);
 
   // Right collar
-  ctx.fillStyle = '#4f46e5';
+  ctx.fillStyle = '#3f6570';
   ctx.fillRect(348 * s, cy - 16 * s, 16 * s, 32 * s);
 
   // Left end cap
-  ctx.fillStyle = '#4f46e5';
+  ctx.fillStyle = '#3f6570';
   ctx.beginPath();
   ctx.roundRect(44 * s, cy - 14 * s, 26 * s, 28 * s, 4 * s);
   ctx.fill();
 
   // Right end cap
-  ctx.fillStyle = '#4f46e5';
+  ctx.fillStyle = '#3f6570';
   ctx.beginPath();
   ctx.roundRect(442 * s, cy - 14 * s, 26 * s, 28 * s, 4 * s);
   ctx.fill();
@@ -77,13 +77,13 @@ function drawIcon(size) {
   const textX = size / 2;
 
   // Stroke for extra weight
-  ctx.strokeStyle = '#f5f5f5';
+  ctx.strokeStyle = '#f3ede0';
   ctx.lineWidth = 6 * s;
   ctx.lineJoin = 'round';
   ctx.strokeText('LIFT', textX, textY);
 
-  // Fill
-  ctx.fillStyle = '#f5f5f5';
+  // Fill — chalk white
+  ctx.fillStyle = '#f3ede0';
   ctx.fillText('LIFT', textX, textY);
 
   return canvas;

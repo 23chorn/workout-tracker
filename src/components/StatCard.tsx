@@ -13,7 +13,7 @@ export function StatCard({ icon: Icon, label, value, sub, color }: {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
-          <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: color ?? 'var(--text)' }}>{value}</div>
+          <div className="num" style={{ fontSize: 22, fontWeight: 600, color: color ?? 'var(--text)' }}>{value}</div>
           {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{sub}</div>}
         </div>
       </div>
@@ -23,7 +23,7 @@ export function StatCard({ icon: Icon, label, value, sub, color }: {
   return (
     <div className="card" style={{ textAlign: 'center' }}>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: color ?? 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      <div className="num" style={{ fontSize: 20, fontWeight: 600, color: color ?? 'var(--text)' }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   );

@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Program, type ProgramDay } from '../../db/database';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { setNavGuard } from '../../utils/navGuard';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X, Notebook } from 'lucide-react';
 
 export function ProgramManager() {
   const programs = useLiveQuery(() => db.programs.toArray()) ?? [];
@@ -107,7 +107,11 @@ export function ProgramManager() {
         <button className="btn btn-sm btn-primary" onClick={startNew}><Plus size={16} /> New</button>
       </div>
       {programs.length === 0 ? (
-        <div className="empty"><p>No programs yet.</p></div>
+        <div className="empty">
+          <Notebook size={28} />
+          <div className="empty-title">No programs yet</div>
+          <p>Build one to plan your training week.</p>
+        </div>
       ) : (
         programs.map(p => {
           const isDefault = p.id === defaultProgramId;

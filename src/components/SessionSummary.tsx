@@ -49,7 +49,7 @@ export function SessionSummary({ data, onDismiss, dismissLabel }: {
           {data.pbs.map((pb, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
               <span style={{ fontSize: 14 }}>{pb.name}</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--yellow)' }}>{pb.e10RM.toFixed(1)} kg</span>
+              <span className="num" style={{ fontSize: 14, fontWeight: 600, color: 'var(--yellow)' }}>{pb.e10RM.toFixed(1)} kg</span>
             </div>
           ))}
         </div>

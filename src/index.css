@@ -1,16 +1,21 @@
 :root {
-  --bg: #0a0a0a;
-  --bg-card: #141414;
-  --bg-input: #1a1a1a;
-  --border: #2a2a2a;
-  --text: #f5f5f5;
-  --text-muted: #888;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --green: #22c55e;
-  --red: #ef4444;
-  --yellow: #eab308;
-  --radius: 12px;
+  /* Iron Ledger — a home-gym logbook, not a wellness app.
+     Warm rubber-floor black, chalk, tempered steel, and the
+     weathered olive/rust/brass of gear that's seen real use. */
+  --bg: #14120f;
+  --bg-card: #1e1b16;
+  --bg-input: #252019;
+  --border: #3a3327;
+  --text: #f3ede0;
+  --text-muted: #8f8776;
+  --accent: #5b8a99;
+  --accent-hover: #71a1b0;
+  --green: #7c8f4f;
+  --red: #b6472e;
+  --yellow: #d6a63d;
+  --radius: 10px;
+  --font-display: 'IBM Plex Sans Condensed', -apple-system, sans-serif;
+  --font-num: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
 }
 
 * {
@@ -27,12 +32,39 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  /* faint fleck, like rubber gym flooring rather than a flat digital black */
+  background-image: radial-gradient(rgba(243, 237, 224, 0.025) 1px, transparent 1.5px);
+  background-size: 4px 4px;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   touch-action: pan-x pan-y;
+}
+
+::selection {
+  background: var(--accent);
+  color: #14120f;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 button {
@@ -85,15 +117,32 @@ select {
 }
 
 .screen h1 {
-  font-size: 24px;
+  font-family: var(--font-display);
+  font-size: 26px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   margin-bottom: 16px;
 }
 
 .screen h2 {
-  font-size: 18px;
+  font-family: var(--font-display);
+  font-size: 17px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
   margin-bottom: 12px;
+}
+
+/* Stamped numerals — every weight, rep, e1RM, timer and split
+   renders here so the data itself reads like it's punched into a plate. */
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.02em;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* Bottom tabs */
@@ -116,13 +165,18 @@ select {
 }
 
 .tab-bar-inner a {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
   padding: 6px 0;
+  font-family: var(--font-display);
   font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--text-muted);
   text-decoration: none;
   transition: color 0.15s;
@@ -132,11 +186,24 @@ select {
   color: var(--accent);
 }
 
-/* Cards */
+/* a collar clamp marking the active tab, echoing the timer bar's accent edge */
+.tab-bar-inner a.active::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* Cards — a brushed-panel edge instead of a flat digital card */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3);
   padding: 16px;
   margin-bottom: 12px;
 }
@@ -149,8 +216,11 @@ select {
   gap: 8px;
   padding: 12px 20px;
   border-radius: 8px;
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   transition: all 0.15s;
   min-height: 48px;
 }
@@ -201,15 +271,18 @@ select {
 .badge {
   display: inline-block;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: 4px;
+  font-family: var(--font-display);
   font-size: 12px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
-.badge-green { background: #22c55e22; color: var(--green); }
-.badge-red { background: #ef444422; color: var(--red); }
-.badge-yellow { background: #eab30822; color: var(--yellow); }
-.badge-accent { background: #6366f122; color: var(--accent); }
+.badge-green { background: #7c8f4f22; color: var(--green); }
+.badge-red { background: #b6472e22; color: var(--red); }
+.badge-yellow { background: #d6a63d22; color: var(--yellow); }
+.badge-accent { background: #5b8a9922; color: var(--accent); }
 
 /* Set row */
 .set-row {
@@ -230,6 +303,8 @@ select {
   padding: 8px;
   text-align: center;
   font-size: 16px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
 }
 
 .picker-input {
@@ -246,7 +321,9 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: inherit;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   width: 100%;
 }
 
@@ -280,30 +357,154 @@ select {
   font-size: 14px;
 }
 
-/* Timer */
-.timer-bar {
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border: 1px solid var(--accent);
+/* the confirm tick is the single most-tapped control in the whole app —
+   give it the weight; the W/WU toggle is rare, so keep it a quiet ghost */
+.set-row .working-toggle.ghost {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto;
+  border: none;
+  background: transparent;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.set-row .working-toggle.ghost.active {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 11px;
+}
+
+@keyframes set-confirm-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 143, 79, 0.5); }
+  50% { box-shadow: 0 0 0 5px rgba(124, 143, 79, 0); }
+}
+
+.set-confirm-ready {
+  animation: set-confirm-glow 1.8s ease-out infinite;
+}
+
+/* Session rail — a strip of station tags across the top of an active
+   session, the same numbering language as the cards below. Tap one to
+   jump straight to that exercise. */
+.session-rail {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.session-rail-token {
+  flex-shrink: 0;
+}
+
+/* Today's session ticket — the one card that gets to look different.
+   A punch-card band up top and a tear line before the actions,
+   because this is the thing you glance at first, every single day. */
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 10px rgba(0, 0, 0, 0.35);
+  margin-bottom: 12px;
+}
+
+.hero-card-band {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--accent);
+  color: #14120f;
+  padding: 6px 16px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hero-card-band .num {
+  color: #14120f;
+  text-shadow: none;
+}
+
+.hero-card-body {
+  padding: 14px 16px 16px;
+}
+
+.hero-card-tear {
+  position: relative;
+  border-top: 2px dashed var(--border);
+  margin: 0 16px;
+}
+
+.hero-card-tear::before,
+.hero-card-tear::after {
+  content: '';
+  position: absolute;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.hero-card-tear::before { left: -23px; }
+.hero-card-tear::after { right: -23px; }
+
+.hero-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+
+/* Timer — reads like a plate-loading display, not a chat-app card */
+.timer-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3);
   padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .timer-display {
-  font-size: 32px;
-  font-weight: 800;
+  font-family: var(--font-num);
+  font-size: 38px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 1px;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.timer-pulse {
+  animation: timer-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-pulse,
+  .set-confirm-ready {
+    animation: none;
+  }
 }
 
 .timer-progress {
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  height: 4px;
+  background: var(--bg-input);
+  background-image: repeating-linear-gradient(90deg, var(--border) 0 1px, transparent 1px 8px);
+  border-radius: 2px;
   overflow: hidden;
   margin-top: 8px;
 }
@@ -311,7 +512,8 @@ select {
 .timer-progress-fill {
   height: 100%;
   background: var(--accent);
-  border-radius: 3px;
+  background-image: repeating-linear-gradient(90deg, rgba(20, 18, 15, 0.35) 0 1px, transparent 1px 8px);
+  border-radius: 2px;
   transition: width 0.5s linear;
 }
 
@@ -320,6 +522,7 @@ select {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3);
   padding: 16px;
   margin-bottom: 12px;
 }
@@ -347,10 +550,12 @@ select {
   grid-template-columns: 40px 1fr 1fr 48px;
   gap: 8px;
   margin-bottom: 6px;
+  font-family: var(--font-display);
   font-size: 11px;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
 }
 
 .set-labels span:not(:first-child) {
@@ -367,8 +572,10 @@ select {
 }
 
 .e10rm .value {
+  font-family: var(--font-num);
   color: var(--accent);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 /* List items */
@@ -380,6 +587,7 @@ select {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3);
   margin-bottom: 8px;
   cursor: pointer;
   transition: background 0.15s;
@@ -435,6 +643,21 @@ select {
   color: var(--text-muted);
 }
 
+.empty svg {
+  opacity: 0.35;
+  margin-bottom: 10px;
+}
+
+.empty .empty-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
 .empty p {
   margin-bottom: 16px;
 }
@@ -444,6 +667,7 @@ select {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3);
   padding: 16px;
   margin-bottom: 12px;
 }
@@ -453,14 +677,17 @@ select {
   overflow: visible;
 }
 
-/* PB indicator */
+/* PB indicator — a brass tag stamped onto the row, not a gradient trophy pill */
 .pb-badge {
-  background: linear-gradient(135deg, #eab308, #f59e0b);
-  color: #000;
+  background: var(--yellow);
+  color: #1a1408;
+  font-family: var(--font-display);
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 3px;
   margin-left: 8px;
 }
 
@@ -479,7 +706,9 @@ select {
 .modal {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 16px 16px 8px 8px;
+  border-top: 2px solid var(--accent);
+  border-radius: 10px 10px 6px 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 -2px 12px rgba(0, 0, 0, 0.4);
   width: 100%;
   max-width: 480px;
   max-height: 85vh;

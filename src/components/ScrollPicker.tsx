@@ -72,7 +72,7 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
         <div style={{ position: 'relative', textAlign: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
           {!manualMode && (
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent)' }}>
+            <div className="num" style={{ fontSize: 28, fontWeight: 600, color: 'var(--accent)' }}>
               {selectedValue}{suffix && <span style={{ fontSize: 16, color: 'var(--text-muted)', marginLeft: 4 }}>{suffix}</span>}
             </div>
           )}
@@ -100,8 +100,9 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
                 onChange={e => setManualValue(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') confirmManual(); }}
                 placeholder="e.g. 67.5"
+                className="num"
                 style={{
-                  width: 120, fontSize: 24, fontWeight: 700, textAlign: 'center',
+                  width: 120, fontSize: 24, fontWeight: 600, textAlign: 'center',
                   background: 'var(--bg-input)', border: '1px solid var(--border)',
                   borderRadius: 8, color: 'var(--text)', padding: '8px 12px',
                 }}
@@ -133,12 +134,12 @@ export function ScrollPicker({ values, value, onChange, onClose, label, suffix }
               {values.map((v, i) => {
                 const isSelected = i === selectedIdx;
                 return (
-                  <div key={i} style={{
+                  <div key={i} className="num" style={{
                     height: ITEM_HEIGHT,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     scrollSnapAlign: 'center',
                     fontSize: isSelected ? 20 : 16,
-                    fontWeight: isSelected ? 700 : 400,
+                    fontWeight: isSelected ? 600 : 400,
                     color: isSelected ? 'var(--text)' : 'var(--text-muted)',
                   }}>
                     {v}

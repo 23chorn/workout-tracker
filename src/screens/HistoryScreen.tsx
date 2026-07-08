@@ -7,7 +7,7 @@ import { CalendarView } from '../components/history/CalendarView';
 import { SessionDetail } from '../components/history/SessionDetail';
 import { RowingSessionDetail } from '../components/history/RowingSessionDetail';
 import { LogPastSession } from '../components/history/LogPastSession';
-import { ChevronLeft, ChevronRight, Calendar, List, Dumbbell, Waves, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, List, Dumbbell, Waves, Plus, History } from 'lucide-react';
 
 type FilterType = 'all' | 'lift' | 'rowing';
 type ListItem =
@@ -147,7 +147,11 @@ export function HistoryScreen() {
       )}
 
       {totalSessions === 0 ? (
-        <div className="empty"><p>No sessions recorded yet. Start a workout in the Today tab.</p></div>
+        <div className="empty">
+          <History size={28} />
+          <div className="empty-title">Nothing logged yet</div>
+          <p>Finish a workout and it'll show up here.</p>
+        </div>
       ) : view === 'calendar' ? (
         <CalendarView sessions={sessions} sessionsByDate={sessionsByDate} rowingByDate={showRowing ? rowingByDate : new Map()} onSelectDate={setSelectedDateKey} />
       ) : (

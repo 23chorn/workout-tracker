@@ -7,7 +7,7 @@ import { calcE10RM, calcE1RM, sessionE10RM, sessionE1RM } from '../utils/e10rm';
 import { useRMMode } from '../contexts/RMModeContext';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { useRestTimer } from '../hooks/useRestTimer';
-import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, ChevronUp, ChevronDown, Plus, Trash2, Notebook } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { SessionSummary, type SessionSummaryData } from '../components/SessionSummary';
@@ -114,6 +114,35 @@ function PlanOverviewModal({ ctx, onClose }: { ctx: TodayContext; onClose: () =>
   );
 }
 
+/* A station tag, like a numbered peg on a rack — outlined while you haven't
+   reached it, filled steel while you're on it, filled olive with a check once
+   every set is confirmed. Order is real information here: it's the sequence
+   you actually move through during the session. */
+function StationMarker({ index, done, current, size = 28 }: { index: number; done: boolean; current: boolean; size?: number }) {
+  if (done) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: size >= 28 ? 6 : 5, background: 'var(--green)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <Check size={size >= 28 ? 14 : 11} color="white" />
+      </div>
+    );
+  }
+  return (
+    <div className="num" style={{
+      width: size, height: size, borderRadius: size >= 28 ? 6 : 5,
+      background: current ? 'var(--accent)' : 'var(--bg-input)',
+      border: current ? 'none' : '1px solid var(--border)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      fontSize: size >= 28 ? 13 : 11, fontWeight: 600,
+      color: current ? '#14120f' : 'var(--text-muted)',
+    }}>
+      {index + 1}
+    </div>
+  );
+}
+
 function PlanTodayCard({ ctx, workoutName, onStart, onSkip, onOpenRowing }: {
   ctx: TodayContext;
   workoutName: string;
@@ -127,38 +156,44 @@ function PlanTodayCard({ ctx, workoutName, onStart, onSkip, onOpenRowing }: {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
-          {ctx.plan.name}
+      <div className="hero-card">
+        <div className="hero-card-band">
+          <span>{ctx.plan.name}</span>
+          <span className="num">Wk {ctx.week}</span>
         </div>
-        <div className="title" style={{ fontSize: 16, marginBottom: 2 }}>
-          {ctx.phase.name} · Week {ctx.week} · {dayName}
-        </div>
-        <div className="subtitle" style={{ marginBottom: 8 }}>
-          {ctx.phaseDay.label}{workoutName && ` — ${workoutName}`}
-        </div>
-        {ctx.phase.notes && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 8 }}>
-            {ctx.phase.notes}
+        <div className="hero-card-body">
+          <div className="title" style={{ fontSize: 16, marginBottom: 2 }}>
+            {ctx.phase.name} · {dayName}
           </div>
-        )}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {!isRest && (
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={onStart}>
-              Start Workout
-            </button>
+          <div className="subtitle">
+            {ctx.phaseDay.label}{workoutName && ` — ${workoutName}`}
+          </div>
+          {ctx.phase.notes && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginTop: 8 }}>
+              {ctx.phase.notes}
+            </div>
           )}
-          <button className="btn btn-secondary" style={{ flex: isRest ? 1 : 0 }} onClick={onSkip}>
-            Skip Day
+        </div>
+        <div className="hero-card-tear" />
+        <div className="hero-card-actions">
+          <div style={{ display: 'flex', gap: 8 }}>
+            {!isRest && (
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={onStart}>
+                Start Workout
+              </button>
+            )}
+            <button className="btn btn-secondary" style={{ flex: isRest ? 1 : 0 }} onClick={onSkip}>
+              Skip Day
+            </button>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary btn-full"
+            style={{ fontSize: 12 }}
+            onClick={() => setShowOverview(true)}
+          >
+            View Full Plan
           </button>
         </div>
-        <button
-          className="btn btn-sm btn-secondary btn-full"
-          style={{ marginTop: 8, fontSize: 12 }}
-          onClick={() => setShowOverview(true)}
-        >
-          View Full Plan
-        </button>
       </div>
 
       {showOverview && <PlanOverviewModal ctx={ctx} onClose={() => setShowOverview(false)} />}
@@ -268,6 +303,13 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
   const [inlineTimerEl, setInlineTimerEl] = useState<HTMLDivElement | null>(null);
   const [inlineTimerVisible, setInlineTimerVisible] = useState(true);
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exerciseRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const scrollToExercise = (idx: number) => {
+    setCollapsedExercises(prev => { if (!prev.has(idx)) return prev; const n = new Set(prev); n.delete(idx); return n; });
+    requestAnimationFrame(() => {
+      exerciseRefs.current.get(idx)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 
   const selectedProgram = programs.find(p => p.id === selectedProgramId) ?? null;
 
@@ -715,70 +757,82 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
           />
         ) : programs.length === 0 ? (
           <div className="empty">
-            <p>No programs yet. Create one in the Manage tab.</p>
+            <Notebook size={28} />
+            <div className="empty-title">No program set up</div>
+            <p>Build one in Manage to see today's plan here.</p>
           </div>
         ) : (
-          <>
-            <div className="form-group">
-              <label>Program</label>
-              <select
-                value={selectedProgramId ?? ''}
-                onChange={e => {
-                  setSelectedProgramId(e.target.value ? Number(e.target.value) : null);
-                  setSelectedDayLabel(null);
-                }}
-              >
-                <option value="">Select a program...</option>
-                {programs.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+          <div className="hero-card">
+            <div className="hero-card-band">
+              <span>Today</span>
+            </div>
+            <div className="hero-card-body" style={{ paddingBottom: selectedProgram ? 14 : undefined }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Program</label>
+                <select
+                  value={selectedProgramId ?? ''}
+                  onChange={e => {
+                    setSelectedProgramId(e.target.value ? Number(e.target.value) : null);
+                    setSelectedDayLabel(null);
+                  }}
+                >
+                  <option value="">Select a program...</option>
+                  {programs.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {selectedProgram && (
-              <div>
-                <label style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, display: 'block' }}>
-                  Which day?
-                </label>
-                {selectedProgram.days.map((day, dayIdx) => {
-                  const wk = workoutMap.get(day.workoutId);
-                  const exNames = wk?.exercises.map(we => exerciseMap.get(we.exerciseId)?.name).filter(Boolean) ?? [];
-                  const dayLabel = wk?.name ?? `Day ${dayIdx + 1}`;
-                  return (
-                    <button
-                      key={dayIdx}
-                      className="card"
-                      style={{ cursor: 'pointer', textAlign: 'left', width: '100%' }}
-                      onClick={() => {
-                        setConfirmAction({
-                          title: 'Start Session',
-                          message: `Start ${wk?.name ?? dayLabel}?`,
-                          onConfirm: () => {
-                            setConfirmAction(null);
-                            setSelectedDayLabel(dayLabel);
-                            loadSession(selectedProgram.id!, selectedProgram.name, dayLabel, day.workoutId);
-                          },
-                        });
-                      }}
-                    >
-                      <div className="row-between" style={{ marginBottom: exNames.length > 0 ? 8 : 0 }}>
-                        <div>
-                          <div className="subtitle" style={{ marginBottom: 2 }}>Day {dayIdx + 1}</div>
-                          <div className="title">{wk?.name ?? 'No workout'}</div>
-                        </div>
-                        <ChevronRight size={18} color="var(--text-muted)" />
-                      </div>
-                      {exNames.length > 0 && (
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                          {exNames.join(' · ')}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                <div className="hero-card-tear" />
+                <div className="hero-card-body">
+                  <label style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, display: 'block' }}>
+                    Which day?
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {selectedProgram.days.map((day, dayIdx) => {
+                      const wk = workoutMap.get(day.workoutId);
+                      const exNames = wk?.exercises.map(we => exerciseMap.get(we.exerciseId)?.name).filter(Boolean) ?? [];
+                      const dayLabel = wk?.name ?? `Day ${dayIdx + 1}`;
+                      return (
+                        <button
+                          key={dayIdx}
+                          className="card"
+                          style={{ cursor: 'pointer', textAlign: 'left', width: '100%', margin: 0 }}
+                          onClick={() => {
+                            setConfirmAction({
+                              title: 'Start Session',
+                              message: `Start ${wk?.name ?? dayLabel}?`,
+                              onConfirm: () => {
+                                setConfirmAction(null);
+                                setSelectedDayLabel(dayLabel);
+                                loadSession(selectedProgram.id!, selectedProgram.name, dayLabel, day.workoutId);
+                              },
+                            });
+                          }}
+                        >
+                          <div className="row-between" style={{ marginBottom: exNames.length > 0 ? 8 : 0 }}>
+                            <div>
+                              <div className="subtitle" style={{ marginBottom: 2 }}>Day {dayIdx + 1}</div>
+                              <div className="title">{wk?.name ?? 'No workout'}</div>
+                            </div>
+                            <ChevronRight size={18} color="var(--text-muted)" />
+                          </div>
+                          {exNames.length > 0 && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                              {exNames.join(' · ')}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             )}
-          </>
+          </div>
         )}
 
         {confirmAction && (
@@ -806,22 +860,43 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
     );
   }
 
+  const currentExIdx = exerciseStates.findIndex((e, i) =>
+    !e.sets.every((_, si) => confirmedSets.has(`${i}-${si}`))
+  );
+
   return (
     <div className="screen">
-      <div className="row-between mb-sm">
-        <div>
-          <h1 style={{ marginBottom: 0 }}>{selectedDayLabel}</h1>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {workoutName} &middot; {Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')} elapsed
-          </div>
+      <div className="row-between" style={{ alignItems: 'flex-start' }}>
+        <h1 style={{ marginBottom: 0 }}>{selectedDayLabel}</h1>
+        <div className="num" style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+          {Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')}
         </div>
       </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{workoutName}</div>
+
+      {exerciseStates.length > 1 && (
+        <div className="session-rail mb-sm">
+          {exerciseStates.map((es, i) => {
+            const done = es.sets.length > 0 && es.sets.every((_, si) => confirmedSets.has(`${i}-${si}`));
+            return (
+              <button
+                key={i}
+                className="session-rail-token"
+                onClick={() => scrollToExercise(i)}
+                aria-label={`Jump to ${exercises.get(es.exerciseId)?.name ?? `exercise ${i + 1}`}`}
+              >
+                <StationMarker index={i} done={done} current={i === currentExIdx && !done} size={22} />
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Fixed timer when inline is scrolled out of view — position:fixed keeps it out of document flow so it can't trigger IntersectionObserver feedback */}
       {timer.active && confirmedSets.size > 0 && !inlineTimerVisible && (
         <div className="timer-bar" style={{
           position: 'fixed',
-          top: 'env(safe-area-inset-top, 0px)',
+          top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
           left: '50%',
           transform: 'translateX(-50%)',
           width: 'calc(100% - 32px)',
@@ -833,7 +908,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
             <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
               {timer.expired ? 'Rest Over' : 'Rest Timer'}
             </div>
-            <div className="timer-display" style={{ color: timer.expired ? 'var(--red)' : 'var(--text)' }}>
+            <div className={`timer-display ${!timer.expired ? 'timer-pulse' : ''}`} style={{ color: timer.expired ? 'var(--red)' : 'var(--text)' }}>
               {timer.expired ? '+' : ''}{Math.floor(Math.abs(timer.remaining) / 60)}:{String(Math.abs(timer.remaining) % 60).padStart(2, '0')}
             </div>
             {!timer.expired && (
@@ -851,10 +926,9 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
 
         const allConfirmed = es.sets.length > 0 && es.sets.every((_, setIdx) => confirmedSets.has(`${exIdx}-${setIdx}`));
 
-        const firstUncompletedIdx = exerciseStates.findIndex((e, i) =>
-          !e.sets.every((_, si) => confirmedSets.has(`${i}-${si}`))
-        );
-        const showTimerHere = timer.active && confirmedSets.size > 0 && exIdx === firstUncompletedIdx;
+        const showTimerHere = timer.active && confirmedSets.size > 0 && exIdx === currentExIdx;
+        const isCurrent = exIdx === currentExIdx && !allConfirmed;
+        const nextSetIdx = isCurrent ? es.sets.findIndex((_, si) => !confirmedSets.has(`${exIdx}-${si}`)) : -1;
 
         const filledSets = es.sets
           .filter(s => s.weight !== '' && s.reps !== '' && s.isWorkingSet)
@@ -862,14 +936,17 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
         const avgE10rm = rmMode === 'e10RM' ? sessionE10RM(filledSets) : sessionE1RM(filledSets);
 
         return (
-          <div key={`${es.exerciseId}-${exIdx}`}>
+          <div
+            key={`${es.exerciseId}-${exIdx}`}
+            ref={(el) => { if (el) exerciseRefs.current.set(exIdx, el); else exerciseRefs.current.delete(exIdx); }}
+          >
           {showTimerHere && (
             <div className="timer-bar" ref={setInlineTimerEl}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, color: timer.expired ? 'var(--red)' : 'var(--text-muted)' }}>
                   {timer.expired ? 'Rest Over' : 'Rest Timer'}
                 </div>
-                <div className="timer-display" style={{ color: timer.expired ? 'var(--red)' : 'var(--text)' }}>
+                <div className={`timer-display ${!timer.expired ? 'timer-pulse' : ''}`} style={{ color: timer.expired ? 'var(--red)' : 'var(--text)' }}>
                   {timer.expired ? '+' : ''}{Math.floor(Math.abs(timer.remaining) / 60)}:{String(Math.abs(timer.remaining) % 60).padStart(2, '0')}
                 </div>
                 {!timer.expired && (
@@ -886,26 +963,14 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
           {collapsedExercises.has(exIdx) ? (
             <div
               className="exercise-card"
-              style={{ padding: '12px 16px', cursor: 'pointer' }}
+              style={{
+                padding: '12px 16px', cursor: 'pointer',
+                opacity: allConfirmed ? 0.55 : 1,
+              }}
               onClick={() => setCollapsedExercises(prev => { const n = new Set(prev); n.delete(exIdx); return n; })}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {allConfirmed ? (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 6, background: 'var(--green)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <Check size={14} color="white" />
-                  </div>
-                ) : (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 6, background: 'var(--bg-input)',
-                    border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <ChevronRight size={14} color="var(--text-muted)" />
-                  </div>
-                )}
+                <StationMarker index={exIdx} done={allConfirmed} current={isCurrent} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{exercise.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
@@ -917,7 +982,10 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
               </div>
             </div>
           ) : (
-          <div className="exercise-card">
+          <div
+            className="exercise-card"
+            style={{ opacity: allConfirmed ? 0.55 : 1 }}
+          >
             <div
               className="exercise-card-header"
               style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}
@@ -927,6 +995,9 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                 setCollapsedExercises(prev => new Set(prev).add(exIdx));
               }}
             >
+              <div style={{ marginTop: 2 }}>
+                <StationMarker index={exIdx} done={allConfirmed} current={isCurrent} />
+              </div>
               {exercise.imageUrl && (
                 <img src={exercise.imageUrl} alt="" style={{
                   width: 40, height: 40, borderRadius: 8, objectFit: 'cover',
@@ -1004,7 +1075,7 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
               </div>
             </div>
 
-            <div className="set-labels" style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px' }}>
+            <div className="set-labels" style={{ gridTemplateColumns: '32px 1fr 1fr 44px 40px 30px' }}>
               <span>Set</span>
               <span>kg</span>
               <span>Reps</span>
@@ -1035,9 +1106,19 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                 tickColor = 'white';
               }
 
+              const isNextUp = setIdx === nextSetIdx;
+
               return (
-                <div className="set-row" key={setIdx} style={{ gridTemplateColumns: '32px 1fr 1fr 44px 36px 36px', opacity: isConfirmed ? 0.45 : 1, transition: 'opacity 0.2s' }}>
-                  <span className="set-num">{setIdx + 1}</span>
+                <div className="set-row" key={setIdx} style={{ gridTemplateColumns: '32px 1fr 1fr 44px 40px 30px', opacity: isConfirmed ? 0.45 : 1, transition: 'opacity 0.2s' }}>
+                  {isNextUp ? (
+                    <span className="num" style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 22, height: 22, borderRadius: 5, margin: '0 auto',
+                      background: 'var(--accent)', color: '#14120f', fontSize: 11, fontWeight: 600,
+                    }}>{setIdx + 1}</span>
+                  ) : (
+                    <span className="set-num">{setIdx + 1}</span>
+                  )}
                   <button
                     className="picker-input"
                     onClick={() => setPicker({ exIdx, setIdx, field: 'weight' })}
@@ -1054,12 +1135,12 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                     {setE10rm > 0 ? setE10rm.toFixed(1) : '—'}
                   </span>
                   <button
-                    className="working-toggle"
+                    className={`working-toggle set-confirm ${isFilled && !isConfirmed ? 'set-confirm-ready' : ''}`}
                     style={{
                       background: tickBg,
                       borderColor: tickBorder,
                       color: tickColor,
-                      width: 32, height: 32, fontSize: 14,
+                      width: 36, height: 36, fontSize: 15,
                     }}
                     onClick={() => {
                       if (isConfirmed) {
@@ -1100,10 +1181,9 @@ export function TodayScreen({ onNavigateRowing }: { onNavigateRowing?: () => voi
                     <Check size={14} />
                   </button>
                   <button
-                    className={`working-toggle ${set.isWorkingSet ? 'active' : ''}`}
+                    className={`working-toggle ghost ${set.isWorkingSet ? 'active' : ''}`}
                     onClick={() => toggleWorking(exIdx, setIdx)}
                     aria-label={set.isWorkingSet ? 'Working set' : 'Warm-up set'}
-                    style={{ width: 32, height: 32 }}
                   >
                     {set.isWorkingSet ? 'W' : 'WU'}
                   </button>

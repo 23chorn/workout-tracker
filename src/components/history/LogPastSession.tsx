@@ -4,7 +4,7 @@ import { db, type Program, type Workout, type Exercise, type SessionExercise } f
 import { sessionE10RM } from '../../utils/e10rm';
 import { ScrollPicker, weightValues, dumbbellWeightValues, repValues } from '../ScrollPicker';
 import { ExercisePicker } from '../ExercisePicker';
-import { ChevronLeft, ChevronUp, ChevronDown, Trash2, Plus, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronUp, ChevronDown, Trash2, Plus, Calendar, Notebook } from 'lucide-react';
 
 const WEIGHTS = weightValues();
 const DB_WEIGHTS = dumbbellWeightValues();
@@ -163,7 +163,11 @@ export function LogPastSession({ onBack, onSaved }: { onBack: () => void; onSave
         </div>
 
         {programs.length === 0 ? (
-          <div className="empty"><p>No programs created yet.</p></div>
+          <div className="empty">
+            <Notebook size={28} />
+            <div className="empty-title">No programs yet</div>
+            <p>Create one in Manage before logging a past session.</p>
+          </div>
         ) : (
           programs.map(p => (
             <div key={p.id} className="card" style={{ marginBottom: 12 }}>
